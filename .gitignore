@@ -1,0 +1,38 @@
+node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+
+# Nest / TS build
+dist/
+build/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Prisma
+apps/api/generated/
+packages/db/generated/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Testing
+coverage/
+playwright-report/
+test-results/

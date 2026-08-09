@@ -1,0 +1,367 @@
+// Prisma schema for Geld Flow.
+// Mirrors §6 of the technical specification. Model fields are camelCase
+// (idiomatic for the generated client); @map keeps the actual Postgres
+// columns snake_case to match the documented schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LedgerType {
+  group_general
+  group_travel
+  group_event
+  personal
+}
+
+enum LedgerRole {
+  owner
+  admin
+  member
+}
+
+enum SplitType {
+  equal
+  percentage
+  exact
+}
+
+enum SettlementStatus {
+  pending
+  confirmed
+  declined
+}
+
+enum ActivityEventType {
+  expense_added
+  expense_edited
+  expense_deleted
+  settlement_requested
+  settlement_confirmed
+  settlement_declined
+  member_joined
+  member_left
+  checklist_item_added
+  checklist_item_completed
+}
+
+enum Rank {
+  I
+  II
+  III
+  IV
+  V
+}
+
+enum AuthProvider {
+  google
+}
+
+enum ChatPlatform {
+  telegram
+}
+
+// ---------------------------------------------------------------- Identity
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  authIdentities    AuthIdentity[]
+  refreshTokens     RefreshToken[]
+  ledgerMembers     LedgerMember[]
+  createdLedgers    Ledger[]        @relation("LedgerCreatedBy")
+  createdInvites    Invite[]
+  expensesPaid      Expense[]       @relation("ExpensePaidBy")
+  expensesCreated   Expense[]       @relation("ExpenseCreatedBy")
+  expenseShares     ExpenseShare[]
+  settlementsFrom   Settlement[]    @relation("SettlementFrom")
+  settlementsTo     Settlement[]    @relation("SettlementTo")
+  activityEvents    ActivityEvent[]
+  score             UserScore?
+  badges            UserBadge[]
+  checklistAssigned ChecklistItem[] @relation("ChecklistAssignedTo")
+  checklistCreated  ChecklistItem[] @relation("ChecklistCreatedBy")
+  chatLinks         ChatLink[]
+
+  @@map("users")
+}
+
+model AuthIdentity {
+  id             String       @id @default(uuid())
+  userId         String       @map("user_id")
+  provider       AuthProvider
+  providerUserId String       @map("provider_user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("auth_identities")
+}
+
+// Passwordless login tokens. Single-use: usedAt is set the moment the
+// token is redeemed so a leaked link can't be replayed.
+model MagicLinkToken {
+  id        String    @id @default(uuid())
+  email     String
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("magic_link_tokens")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  userAgent String?   @map("user_agent")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ------------------------------------------------------------ Ledger core
+
+// The shared engine table: a "Group" and a "Personal" split are both a
+// Ledger, distinguished only by `type`. Every balance query is scoped to
+// exactly one ledgerId — that scoping is what keeps a group debt and a
+// personal debt between the same two people from ever being summed.
+model Ledger {
+  id           String     @id @default(uuid())
+  type         LedgerType
+  name         String?
+  baseCurrency String     @map("base_currency") @db.Char(3)
+  createdById  String     @map("created_by")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  archivedAt   DateTime?  @map("archived_at")
+
+  createdBy      User            @relation("LedgerCreatedBy", fields: [createdById], references: [id])
+  members        LedgerMember[]
+  invites        Invite[]
+  expenses       Expense[]
+  settlements    Settlement[]
+  activityEvents ActivityEvent[]
+  checklistItems ChecklistItem[]
+  chatLinks      ChatLink[]
+
+  @@map("ledgers")
+}
+
+// NOTE: a partial unique index capping personal ledgers at one per
+// (least(userA), greatest(userB)) friend pair can't be expressed in the
+// Prisma schema DSL (no partial/conditional unique constraints). It's
+// added as raw SQL in the first migration instead — see Phase 1.
+model LedgerMember {
+  ledgerId String     @map("ledger_id")
+  userId   String     @map("user_id")
+  role     LedgerRole @default(member)
+  joinedAt DateTime   @default(now()) @map("joined_at")
+
+  ledger Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([ledgerId, userId])
+  @@index([userId])
+  @@map("ledger_members")
+}
+
+model Invite {
+  id          String    @id @default(uuid())
+  ledgerId    String    @map("ledger_id")
+  tokenHash   String    @unique @map("token_hash")
+  createdById String    @map("created_by")
+  expiresAt   DateTime  @map("expires_at")
+  maxUses     Int       @default(1) @map("max_uses")
+  useCount    Int       @default(0) @map("use_count")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  ledger    Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  @@index([ledgerId])
+  @@map("invites")
+}
+
+// Append-only. This is the activity ledger feature — every mutation
+// worth showing in the timeline writes one row here.
+model ActivityEvent {
+  id        String            @id @default(uuid())
+  ledgerId  String            @map("ledger_id")
+  actorId   String            @map("actor_id")
+  type      ActivityEventType
+  payload   Json
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  ledger Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  actor  User   @relation(fields: [actorId], references: [id])
+
+  @@index([ledgerId, createdAt])
+  @@map("activity_events")
+}
+
+// ----------------------------------------------------------------- Money
+
+model Expense {
+  id           String    @id @default(uuid())
+  ledgerId     String    @map("ledger_id")
+  description  String
+  amount       Decimal   @db.Decimal(12, 2)
+  currency     String    @db.Char(3)
+  paidByUserId String    @map("paid_by") // who fronted the money
+  splitType    SplitType @map("split_type")
+  category     String?
+  receiptUrl   String?   @map("receipt_url")
+  createdById  String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  // Soft delete only — a voided expense stays for the audit trail but is
+  // excluded from every balance and list query once this is set.
+  deletedAt    DateTime? @map("deleted_at")
+
+  ledger    Ledger         @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  paidBy    User           @relation("ExpensePaidBy", fields: [paidByUserId], references: [id])
+  createdBy User           @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  shares    ExpenseShare[]
+
+  @@index([ledgerId, createdAt])
+  @@index([ledgerId, deletedAt])
+  @@map("expenses")
+}
+
+// Computed once when the expense is written (or edited) and stored —
+// never recalculated from splitType on read. See §2 "Expense logic".
+model ExpenseShare {
+  id              String   @id @default(uuid())
+  expenseId       String   @map("expense_id")
+  userId          String   @map("user_id")
+  shareAmount     Decimal  @map("share_amount") @db.Decimal(12, 2)
+  sharePercentage Decimal? @map("share_percentage") @db.Decimal(5, 2)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+  @@map("expense_shares")
+}
+
+// status: pending -> confirmed | declined. Only "confirmed" affects a
+// balance or the rank system — see §3 "Settlement integrity".
+model Settlement {
+  id          String           @id @default(uuid())
+  ledgerId    String           @map("ledger_id")
+  fromUserId  String           @map("from_user")
+  toUserId    String           @map("to_user")
+  amount      Decimal          @db.Decimal(12, 2)
+  currency    String           @db.Char(3)
+  status      SettlementStatus @default(pending)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  confirmedAt DateTime?        @map("confirmed_at")
+
+  ledger   Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  fromUser User   @relation("SettlementFrom", fields: [fromUserId], references: [id])
+  toUser   User   @relation("SettlementTo", fields: [toUserId], references: [id])
+
+  @@index([ledgerId])
+  @@map("settlements")
+}
+
+// ------------------------------------------------------------ Gamification
+
+// One row per user — rank is profile-wide, not per-ledger, since it's a
+// signal about the person, not about any one group.
+model UserScore {
+  userId                String   @id @map("user_id")
+  currentRank           Rank     @default(I) @map("current_rank")
+  rollingAvgSettleHours Float?   @map("rolling_avg_settle_hours")
+  confirmedSettlements  Int      @default(0) @map("confirmed_settlements")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_scores")
+}
+
+model Badge {
+  id            String @id @default(uuid())
+  key           String @unique
+  name          String
+  description   String
+  iconRef       String @map("icon_ref")
+  criteriaType  String @map("criteria_type")
+  criteriaValue String @map("criteria_value")
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  userId   String   @map("user_id")
+  badgeId  String   @map("badge_id")
+  earnedAt DateTime @default(now()) @map("earned_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, badgeId])
+  @@map("user_badges")
+}
+
+// ------------------------------------------------------- Contextual & bot
+
+// Event-mode ledgers only; enforced in application code, not the schema.
+model ChecklistItem {
+  id           String    @id @default(uuid())
+  ledgerId     String    @map("ledger_id")
+  title        String
+  isDone       Boolean   @default(false) @map("is_done")
+  assignedToId String?   @map("assigned_to")
+  dueDate      DateTime? @map("due_date")
+  createdById  String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  ledger     Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  assignedTo User?  @relation("ChecklistAssignedTo", fields: [assignedToId], references: [id])
+  createdBy  User   @relation("ChecklistCreatedBy", fields: [createdById], references: [id])
+
+  @@index([ledgerId])
+  @@map("checklist_items")
+}
+
+// Maps a Telegram chat to the ledger it writes parsed expenses into.
+// userId is nullable until whoever set up the link authenticates it.
+model ChatLink {
+  id             String       @id @default(uuid())
+  userId         String?      @map("user_id")
+  platform       ChatPlatform
+  externalChatId String       @map("external_chat_id")
+  externalUserId String?      @map("external_user_id")
+  ledgerId       String       @map("ledger_id")
+  linkedAt       DateTime     @default(now()) @map("linked_at")
+
+  user   User?  @relation(fields: [userId], references: [id])
+  ledger Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, externalChatId])
+  @@map("chat_links")
+}
