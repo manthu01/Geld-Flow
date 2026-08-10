@@ -5,5 +5,6 @@ import { BalancesService } from './balances.service';
 @Module({
   controllers: [BalancesController],
   providers: [BalancesService],
+  exports: [BalancesService],
 })
 export class BalancesModule {}

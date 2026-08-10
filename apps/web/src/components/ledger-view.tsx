@@ -11,7 +11,9 @@ import {
   declineSettlement,
   deleteExpense,
   getBalances,
+  getDebtSimplification,
   getLedgerDetail,
+  getUserScore,
   listActivity,
   listExpenses,
   listSettlements,
@@ -20,8 +22,14 @@ import {
   type ExpenseView,
   type LedgerDetail,
   type MemberBalance,
+  type ScoreView,
   type SettlementView,
+  type SimplifiedTransfer,
 } from "@/lib/api";
+
+function rankLabel(score: ScoreView | undefined): string {
+  return score ? `Rank ${score.currentRank}` : "";
+}
 
 const GROUP_TYPE_LABELS: Record<string, string> = {
   group_general: "General group",
@@ -60,6 +68,8 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
   const [expenses, setExpenses] = useState<ExpenseView[]>([]);
   const [activity, setActivity] = useState<ActivityEventView[]>([]);
   const [settlements, setSettlements] = useState<SettlementView[]>([]);
+  const [scores, setScores] = useState<Record<string, ScoreView>>({});
+  const [debtSuggestions, setDebtSuggestions] = useState<SimplifiedTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +77,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
   const [editingExpense, setEditingExpense] = useState<ExpenseView | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [settleTarget, setSettleTarget] = useState<string | null>(null);
+  const [settleAmountHint, setSettleAmountHint] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -86,6 +97,21 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
       setExpenses(expenseData.items);
       setActivity(activityData.items);
       setSettlements(settlementData);
+
+      const scoreEntries = await Promise.all(
+        ledgerData.members.map(
+          async (m) => [m.userId, await getUserScore(authFetch, m.userId)] as const,
+        ),
+      );
+      setScores(Object.fromEntries(scoreEntries));
+
+      // Simplification is only meaningful for 3+ people — a personal
+      // ledger is already just the two of you.
+      setDebtSuggestions(
+        ledgerData.type === "personal"
+          ? []
+          : await getDebtSimplification(authFetch, ledgerId),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load this ledger.");
     } finally {
@@ -196,7 +222,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
           {balances.map((b) => (
             <div key={b.userId} className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-ink">
-                {b.userId === user?.id ? "You" : b.name}
+                {b.userId === user?.id ? "You" : b.name}{" "}
+                <span className="font-mono text-xs text-ink-soft">
+                  {rankLabel(scores[b.userId])}
+                </span>
               </span>
               <div className="flex items-center gap-3">
                 <span
@@ -213,7 +242,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                 </span>
                 {b.userId !== user?.id && (
                   <button
-                    onClick={() => setSettleTarget(b.userId)}
+                    onClick={() => {
+                      setSettleTarget(b.userId);
+                      setSettleAmountHint("");
+                    }}
                     className="text-xs text-accent-strong underline underline-offset-2"
                   >
                     Settle up
@@ -224,6 +256,43 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
           ))}
         </GlassCard>
       </section>
+
+      {debtSuggestions.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-medium">Simplify debts</h2>
+          <p className="text-xs text-ink-soft">
+            The fewest payments that would settle everyone up.
+          </p>
+          <GlassCard className="divide-y divide-surface-border p-0">
+            {debtSuggestions.map((t, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between px-4 py-3 text-sm text-ink"
+              >
+                <span>
+                  {t.fromUserId === user?.id ? "You" : memberById.get(t.fromUserId)?.name}{" "}
+                  owe{t.fromUserId === user?.id ? "" : "s"}{" "}
+                  {t.toUserId === user?.id ? "you" : memberById.get(t.toUserId)?.name}{" "}
+                  <span className="font-mono">
+                    {t.amount.toFixed(2)} {ledger.baseCurrency}
+                  </span>
+                </span>
+                {t.fromUserId === user?.id && (
+                  <button
+                    onClick={() => {
+                      setSettleTarget(t.toUserId);
+                      setSettleAmountHint(String(t.amount));
+                    }}
+                    className="text-xs text-accent-strong underline underline-offset-2"
+                  >
+                    Settle this
+                  </button>
+                )}
+              </div>
+            ))}
+          </GlassCard>
+        </section>
+      )}
 
       {pendingForMe.length > 0 && (
         <section className="space-y-3">
@@ -266,6 +335,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
               min="0.01"
               step="0.01"
               required
+              defaultValue={settleAmountHint || undefined}
               placeholder="0.00"
               className="w-32 rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />

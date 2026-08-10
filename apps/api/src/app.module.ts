@@ -9,6 +9,8 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { BalancesModule } from './balances/balances.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { ActivityModule } from './activity/activity.module';
+import { ReputationModule } from './reputation/reputation.module';
+import { DebtSimplificationModule } from './debt-simplification/debt-simplification.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { ActivityModule } from './activity/activity.module';
     BalancesModule,
     SettlementsModule,
     ActivityModule,
+    ReputationModule,
+    DebtSimplificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

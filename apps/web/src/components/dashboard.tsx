@@ -6,10 +6,12 @@ import { GlassCard } from "@/components/glass-card";
 import { useAuth } from "@/lib/auth-context";
 import {
   createGroupLedger,
+  getMyScore,
   getOrCreatePersonalLedger,
   listMyLedgers,
   redeemInvite,
   type LedgerSummary,
+  type ScoreView,
 } from "@/lib/api";
 
 const GROUP_TYPE_LABELS: Record<string, string> = {
@@ -55,6 +57,7 @@ export function Dashboard() {
 
   const [groups, setGroups] = useState<LedgerSummary[]>([]);
   const [personal, setPersonal] = useState<LedgerSummary[]>([]);
+  const [score, setScore] = useState<ScoreView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,9 +71,13 @@ export function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listMyLedgers(authFetch);
+      const [data, scoreData] = await Promise.all([
+        listMyLedgers(authFetch),
+        getMyScore(authFetch),
+      ]);
       setGroups(data.groups);
       setPersonal(data.personal);
+      setScore(scoreData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load your ledgers.");
     } finally {
@@ -144,6 +151,12 @@ export function Dashboard() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">
           Welcome back, {user?.name}
         </h1>
+        {score && (
+          <p className="font-mono text-xs text-ink-soft">
+            Rank {score.currentRank} · {score.confirmedSettlements} settlement
+            {score.confirmedSettlements === 1 ? "" : "s"} confirmed
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">

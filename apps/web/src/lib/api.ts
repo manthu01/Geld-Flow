@@ -303,3 +303,41 @@ export async function listActivity(
     await authFetch(`/ledgers/${ledgerId}/activity?page=${page}&pageSize=${pageSize}`),
   );
 }
+
+// -------------------------------------------------------------- Reputation
+
+export type Rank = "I" | "II" | "III" | "IV" | "V";
+
+export interface ScoreView {
+  userId: string;
+  currentRank: Rank;
+  rollingAvgSettleHours: number | null;
+  confirmedSettlements: number;
+  updatedAt: string | null;
+}
+
+export async function getMyScore(authFetch: AuthFetch): Promise<ScoreView> {
+  return parseJson(await authFetch("/reputation/me"));
+}
+
+export async function getUserScore(
+  authFetch: AuthFetch,
+  userId: string,
+): Promise<ScoreView> {
+  return parseJson(await authFetch(`/reputation/${userId}`));
+}
+
+// ------------------------------------------------------ Debt simplification
+
+export interface SimplifiedTransfer {
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+}
+
+export async function getDebtSimplification(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<SimplifiedTransfer[]> {
+  return parseJson(await authFetch(`/ledgers/${ledgerId}/debt-simplification`));
+}

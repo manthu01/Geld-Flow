@@ -7,10 +7,14 @@ import {
 import { prisma } from '@geld-flow/db';
 import type { CreateSettlementInput } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
+import { ReputationService } from '../reputation/reputation.service';
 
 @Injectable()
 export class SettlementsService {
-  constructor(private readonly access: LedgerAccessService) {}
+  constructor(
+    private readonly access: LedgerAccessService,
+    private readonly reputation: ReputationService,
+  ) {}
 
   async list(ledgerId: string, userId: string) {
     await this.access.assertMember(ledgerId, userId);
@@ -96,6 +100,15 @@ export class SettlementsService {
           payload: { settlementId, amount: Number(settlement.amount) },
         },
       });
+
+      await this.reputation.recordConfirmedSettlement(
+        tx,
+        settlement.fromUserId,
+        {
+          createdAt: settlement.createdAt,
+          confirmedAt: updated.confirmedAt!,
+        },
+      );
 
       return updated;
     });
