@@ -1,6 +1,15 @@
 import { z } from "zod";
 
 /**
+ * Auth. Shared so the login form and the API validate email addresses
+ * with the exact same rule.
+ */
+export const requestMagicLinkSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+export type RequestMagicLinkInput = z.infer<typeof requestMagicLinkSchema>;
+
+/**
  * Enums mirrored from packages/db/prisma/schema.prisma.
  * Kept here (not imported from @prisma/client) so apps/web never needs
  * the Prisma client in its bundle — only apps/api touches the database.
