@@ -13,6 +13,7 @@ import { ReputationModule } from './reputation/reputation.module';
 import { DebtSimplificationModule } from './debt-simplification/debt-simplification.module';
 import { ChecklistModule } from './checklist/checklist.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { BadgesModule } from './badges/badges.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { TelegramModule } from './telegram/telegram.module';
     DebtSimplificationModule,
     ChecklistModule,
     TelegramModule,
+    BadgesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

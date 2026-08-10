@@ -3,6 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
+import { GooeyOrbs } from "@/components/gooey-orbs";
 import { API_URL, requestMagicLink } from "@/lib/api";
 
 function LoginError() {
@@ -39,6 +40,9 @@ export default function LoginPage() {
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
+          <div className="flex justify-center">
+            <GooeyOrbs />
+          </div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">
             Sign in to Geld Flow
           </h1>

@@ -7,6 +7,7 @@ import { ExpenseForm } from "@/components/expense-form";
 import { ChecklistPanel } from "@/components/checklist-panel";
 import { TripStatsPanel } from "@/components/trip-stats-panel";
 import { TelegramConnect } from "@/components/telegram-connect";
+import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import {
   confirmSettlement,
@@ -425,7 +426,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
         )}
 
         {expenses.length === 0 ? (
-          <p className="text-sm text-ink-soft">No expenses yet.</p>
+          <EmptyState title="No expenses yet" hint="Add the first one above." />
         ) : (
           <div className="space-y-2">
             {expenses.map((e) => {
@@ -478,7 +479,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
       <section className="space-y-3">
         <h2 className="font-display text-lg font-medium">Activity</h2>
         {activity.length === 0 ? (
-          <p className="text-sm text-ink-soft">No activity yet.</p>
+          <EmptyState title="No activity yet" />
         ) : (
           <GlassCard className="divide-y divide-surface-border p-0">
             {activity.map((event) => (

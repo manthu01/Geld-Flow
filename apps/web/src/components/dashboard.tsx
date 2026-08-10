@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
+import { BadgeCase } from "@/components/badge-case";
+import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import {
   createGroupLedger,
@@ -159,6 +161,8 @@ export function Dashboard() {
         )}
       </div>
 
+      <BadgeCase />
+
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => {
@@ -276,7 +280,7 @@ export function Dashboard() {
           <section className="space-y-3">
             <h2 className="font-display text-lg font-medium">Groups</h2>
             {groups.length === 0 ? (
-              <p className="text-sm text-ink-soft">No group ledgers yet.</p>
+              <EmptyState title="No group ledgers yet" hint="Start a trip, event, or tab above." />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {groups.map((g) => (
@@ -289,7 +293,7 @@ export function Dashboard() {
           <section className="space-y-3">
             <h2 className="font-display text-lg font-medium">Personal</h2>
             {personal.length === 0 ? (
-              <p className="text-sm text-ink-soft">No personal ledgers yet.</p>
+              <EmptyState title="No personal ledgers yet" hint="Open one with a friend's email above." />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {personal.map((p) => {

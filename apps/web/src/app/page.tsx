@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Dashboard } from "@/components/dashboard";
+import { GooeyOrbs } from "@/components/gooey-orbs";
 import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
@@ -26,6 +27,9 @@ export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="w-full max-w-md space-y-2 text-center">
+        <div className="flex justify-center pb-1">
+          <GooeyOrbs />
+        </div>
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft">
           Geld Flow
         </p>

@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { LedgersController } from './ledgers.controller';
 import { InvitesController } from './invites.controller';
 import { LedgersService } from './ledgers.service';
+import { BadgesModule } from '../badges/badges.module';
 
 @Module({
+  imports: [BadgesModule],
   controllers: [LedgersController, InvitesController],
   providers: [LedgersService],
   exports: [LedgersService],

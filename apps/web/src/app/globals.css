@@ -3,34 +3,56 @@
 :root {
   --bg: #f3f4f7;
   --bg-elevated: #ffffff;
-  --surface: rgba(15, 23, 42, 0.04);
-  --surface-strong: rgba(15, 23, 42, 0.07);
-  --surface-border: rgba(15, 23, 42, 0.09);
+  --surface: rgba(15, 23, 42, 0.045);
+  --surface-strong: rgba(15, 23, 42, 0.08);
+  --surface-border: rgba(15, 23, 42, 0.1);
+  --surface-highlight: rgba(255, 255, 255, 0.7);
   --ink: #12151b;
   --ink-soft: #5b6472;
   --accent: #d9531f;
   --accent-strong: #b8431a;
   --accent-tint: rgba(217, 83, 31, 0.12);
+  --accent-2: #7c5cff;
+  --accent-2-strong: #6842e0;
+  --accent-2-tint: rgba(124, 92, 255, 0.14);
   --owed: #17915f;
   --owes: #d33a3a;
   --ring: rgba(217, 83, 31, 0.45);
+  --glass-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 20px 48px -24px rgba(15, 23, 42, 0.3);
+  --aurora-1: #ffb199;
+  --aurora-2: #a78bfa;
+  --aurora-3: #5fd8bd;
+  --badge-gold: #c99a1e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0d12;
+    --bg: #05070b;
     --bg-elevated: #12161f;
-    --surface: rgba(255, 255, 255, 0.05);
-    --surface-strong: rgba(255, 255, 255, 0.09);
-    --surface-border: rgba(255, 255, 255, 0.11);
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-strong: rgba(255, 255, 255, 0.1);
+    --surface-border: rgba(255, 255, 255, 0.12);
+    --surface-highlight: rgba(255, 255, 255, 0.16);
     --ink: #eceef3;
     --ink-soft: #98a2b5;
     --accent: #ff7a45;
     --accent-strong: #ffa47a;
     --accent-tint: rgba(255, 122, 69, 0.16);
+    --accent-2: #a78bfa;
+    --accent-2-strong: #c4b3ff;
+    --accent-2-tint: rgba(167, 139, 250, 0.18);
     --owed: #3ddb9b;
     --owes: #ff6b6b;
     --ring: rgba(255, 122, 69, 0.5);
+    --glass-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.3),
+      0 24px 60px -20px rgba(0, 0, 0, 0.65);
+    --aurora-1: #ff7a45;
+    --aurora-2: #7c5cff;
+    --aurora-3: #16b88a;
+    --badge-gold: #ffd93d;
   }
 }
 
@@ -40,14 +62,19 @@
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
   --color-surface-border: var(--surface-border);
+  --color-surface-highlight: var(--surface-highlight);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-tint: var(--accent-tint);
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-strong: var(--accent-2-strong);
+  --color-accent-2-tint: var(--accent-2-tint);
   --color-owed: var(--owed);
   --color-owes: var(--owes);
   --color-ring: var(--ring);
+  --color-badge-gold: var(--badge-gold);
 
   --font-display: var(--font-bricolage);
   --font-sans: var(--font-manrope);
@@ -68,4 +95,160 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------- Aurora backdrop */
+/* Fixed, decorative, and behind everything — a slow-drifting gradient-mesh
+   glow that gives glass surfaces something non-flat to actually blur. */
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora__blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  will-change: transform;
+}
+
+.aurora__blob--1 {
+  top: -12%;
+  left: -8%;
+  width: 55vw;
+  height: 55vw;
+  background: var(--aurora-1);
+  opacity: 0.32;
+  animation: aurora-drift-1 26s ease-in-out infinite;
+}
+
+.aurora__blob--2 {
+  bottom: -18%;
+  right: -10%;
+  width: 60vw;
+  height: 60vw;
+  background: var(--aurora-2);
+  opacity: 0.28;
+  animation: aurora-drift-2 32s ease-in-out infinite;
+}
+
+.aurora__blob--3 {
+  top: 28%;
+  right: 15%;
+  width: 38vw;
+  height: 38vw;
+  background: var(--aurora-3);
+  opacity: 0.22;
+  animation: aurora-drift-3 22s ease-in-out infinite;
+}
+
+@keyframes aurora-drift-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6vw, 8vh) scale(1.08);
+  }
+}
+
+@keyframes aurora-drift-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-8vw, -6vh) scale(1.05);
+  }
+}
+
+@keyframes aurora-drift-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-5vw, 5vh) scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora__blob {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------- Gooey orbs */
+/* A small liquid brand mark: three blobs that continuously drift and merge,
+   the "melt together" look coming from an SVG goo filter (blur, then a
+   contrast-boosting color matrix that snaps the blur back to hard edges). */
+
+.gooey-orb {
+  position: absolute;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+.gooey-orb--1 {
+  top: 6px;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  animation: gooey-drift-1 6s ease-in-out infinite;
+}
+
+.gooey-orb--2 {
+  top: 18px;
+  left: 26px;
+  width: 22px;
+  height: 22px;
+  animation: gooey-drift-2 7s ease-in-out infinite;
+}
+
+.gooey-orb--3 {
+  top: 2px;
+  left: 30px;
+  width: 18px;
+  height: 18px;
+  animation: gooey-drift-3 5s ease-in-out infinite;
+}
+
+@keyframes gooey-drift-1 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(6px, 4px);
+  }
+}
+
+@keyframes gooey-drift-2 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-6px, -4px);
+  }
+}
+
+@keyframes gooey-drift-3 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-4px, 6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gooey-orb {
+    animation: none;
+  }
 }

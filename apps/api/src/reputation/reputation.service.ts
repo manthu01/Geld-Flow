@@ -41,7 +41,11 @@ export class ReputationService {
     tx: Prisma.TransactionClient,
     userId: string,
     timing: { createdAt: Date; confirmedAt: Date },
-  ): Promise<void> {
+  ): Promise<{
+    confirmedSettlements: number;
+    currentRank: ReturnType<typeof computeRank>;
+    hours: number;
+  }> {
     const hours =
       (timing.confirmedAt.getTime() - timing.createdAt.getTime()) /
       (1000 * 60 * 60);
@@ -65,5 +69,7 @@ export class ReputationService {
       },
       update: { confirmedSettlements, rollingAvgSettleHours, currentRank },
     });
+
+    return { confirmedSettlements, currentRank, hours };
   }
 }

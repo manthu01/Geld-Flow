@@ -8,12 +8,14 @@ import { prisma } from '@geld-flow/db';
 import type { CreateSettlementInput } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
 import { ReputationService } from '../reputation/reputation.service';
+import { BadgesService } from '../badges/badges.service';
 
 @Injectable()
 export class SettlementsService {
   constructor(
     private readonly access: LedgerAccessService,
     private readonly reputation: ReputationService,
+    private readonly badges: BadgesService,
   ) {}
 
   async list(ledgerId: string, userId: string) {
@@ -101,14 +103,28 @@ export class SettlementsService {
         },
       });
 
-      await this.reputation.recordConfirmedSettlement(
-        tx,
-        settlement.fromUserId,
-        {
-          createdAt: settlement.createdAt,
-          confirmedAt: updated.confirmedAt!,
-        },
-      );
+      const { confirmedSettlements, currentRank, hours } =
+        await this.reputation.recordConfirmedSettlement(
+          tx,
+          settlement.fromUserId,
+          {
+            createdAt: settlement.createdAt,
+            confirmedAt: updated.confirmedAt!,
+          },
+        );
+
+      if (confirmedSettlements === 1) {
+        await this.badges.award(tx, settlement.fromUserId, 'first-settlement');
+      }
+      if (confirmedSettlements === 10) {
+        await this.badges.award(tx, settlement.fromUserId, 'reliable-payer');
+      }
+      if (currentRank === 'V') {
+        await this.badges.award(tx, settlement.fromUserId, 'legendary');
+      }
+      if (hours < 1) {
+        await this.badges.award(tx, settlement.fromUserId, 'speedy-settler');
+      }
 
       return updated;
     });

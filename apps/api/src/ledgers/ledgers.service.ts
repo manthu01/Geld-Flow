@@ -11,6 +11,7 @@ import type {
   GetOrCreatePersonalLedgerInput,
 } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
+import { BadgesService } from '../badges/badges.service';
 
 function hashToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
@@ -25,7 +26,10 @@ const MEMBER_SELECT = {
 
 @Injectable()
 export class LedgersService {
-  constructor(private readonly access: LedgerAccessService) {}
+  constructor(
+    private readonly access: LedgerAccessService,
+    private readonly badges: BadgesService,
+  ) {}
 
   async createGroup(userId: string, input: CreateLedgerInput): Promise<Ledger> {
     if (input.type === 'personal') {
@@ -34,14 +38,25 @@ export class LedgersService {
       );
     }
 
-    return prisma.ledger.create({
-      data: {
-        type: input.type,
-        name: input.name,
-        baseCurrency: input.baseCurrency.toUpperCase(),
-        createdById: userId,
-        members: { create: { userId, role: 'owner' } },
-      },
+    return prisma.$transaction(async (tx) => {
+      const ledger = await tx.ledger.create({
+        data: {
+          type: input.type,
+          name: input.name,
+          baseCurrency: input.baseCurrency.toUpperCase(),
+          createdById: userId,
+          members: { create: { userId, role: 'owner' } },
+        },
+      });
+
+      const groupCount = await tx.ledger.count({
+        where: { createdById: userId, type: { not: 'personal' } },
+      });
+      if (groupCount === 1) {
+        await this.badges.award(tx, userId, 'group-founder');
+      }
+
+      return ledger;
     });
   }
 
@@ -173,20 +188,31 @@ export class LedgersService {
       return existing;
     }
 
-    return prisma.ledger.create({
-      data: {
-        type: 'personal',
-        baseCurrency: input.baseCurrency.toUpperCase(),
-        createdById: userId,
-        personalUserAId: a,
-        personalUserBId: b,
-        members: {
-          create: [
-            { userId, role: 'owner' },
-            { userId: peer.id, role: 'member' },
-          ],
+    return prisma.$transaction(async (tx) => {
+      const ledger = await tx.ledger.create({
+        data: {
+          type: 'personal',
+          baseCurrency: input.baseCurrency.toUpperCase(),
+          createdById: userId,
+          personalUserAId: a,
+          personalUserBId: b,
+          members: {
+            create: [
+              { userId, role: 'owner' },
+              { userId: peer.id, role: 'member' },
+            ],
+          },
         },
-      },
+      });
+
+      const personalCount = await tx.ledger.count({
+        where: { createdById: userId, type: 'personal' },
+      });
+      if (personalCount === 1) {
+        await this.badges.award(tx, userId, 'peacemaker');
+      }
+
+      return ledger;
     });
   }
 }

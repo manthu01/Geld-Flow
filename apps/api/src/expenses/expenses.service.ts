@@ -7,6 +7,7 @@ import {
 import { prisma, type Expense } from '@geld-flow/db';
 import type { CreateExpenseInput, EditExpenseInput } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
+import { BadgesService } from '../badges/badges.service';
 import { computeShares } from './split.util';
 
 const EXPENSE_INCLUDE = {
@@ -24,7 +25,10 @@ const EXPENSE_INCLUDE = {
 
 @Injectable()
 export class ExpensesService {
-  constructor(private readonly access: LedgerAccessService) {}
+  constructor(
+    private readonly access: LedgerAccessService,
+    private readonly badges: BadgesService,
+  ) {}
 
   private async assertParticipantsAreMembers(
     ledgerId: string,
@@ -101,6 +105,13 @@ export class ExpensesService {
           },
         },
       });
+
+      const totalCreated = await tx.expense.count({
+        where: { createdById: userId },
+      });
+      if (totalCreated === 1) {
+        await this.badges.award(tx, userId, 'first-steps');
+      }
 
       return created;
     });

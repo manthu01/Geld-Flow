@@ -405,3 +405,26 @@ export async function createTelegramLinkCode(
 ): Promise<{ code: string; botUsername: string | null; expiresInMinutes: number }> {
   return parseJson(await postJson(authFetch, `/ledgers/${ledgerId}/telegram-link`));
 }
+
+// -------------------------------------------------------------------- Badges
+
+export interface BadgeView {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  iconRef: string;
+  earned: boolean;
+  earnedAt: string | null;
+}
+
+export async function getMyBadges(authFetch: AuthFetch): Promise<BadgeView[]> {
+  return parseJson(await authFetch("/badges/me"));
+}
+
+export async function getUserBadges(
+  authFetch: AuthFetch,
+  userId: string,
+): Promise<BadgeView[]> {
+  return parseJson(await authFetch(`/badges/${userId}`));
+}

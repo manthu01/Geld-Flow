@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { GlassCard } from "@/components/glass-card";
+import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import {
   createChecklistItem,
@@ -116,7 +117,7 @@ export function ChecklistPanel({
       {loading ? (
         <p className="text-sm text-ink-soft">Loading checklist…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-ink-soft">No tasks yet.</p>
+        <EmptyState title="No tasks yet" />
       ) : (
         <GlassCard className="divide-y divide-surface-border p-0">
           {items.map((item) => (

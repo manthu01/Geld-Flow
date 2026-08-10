@@ -9,10 +9,14 @@ import type {
   EditChecklistItemInput,
 } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
+import { BadgesService } from '../badges/badges.service';
 
 @Injectable()
 export class ChecklistService {
-  constructor(private readonly access: LedgerAccessService) {}
+  constructor(
+    private readonly access: LedgerAccessService,
+    private readonly badges: BadgesService,
+  ) {}
 
   async list(ledgerId: string, userId: string) {
     await this.access.assertMember(ledgerId, userId);
@@ -121,6 +125,13 @@ export class ChecklistService {
             payload: { checklistItemId: itemId, title: result.title },
           },
         });
+
+        const completedCount = await tx.activityEvent.count({
+          where: { actorId: userId, type: 'checklist_item_completed' },
+        });
+        if (completedCount === 5) {
+          await this.badges.award(tx, userId, 'checklist-champion');
+        }
       }
 
       return result;
