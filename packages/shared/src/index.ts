@@ -142,3 +142,23 @@ export const createSettlementSchema = z.object({
   currency: z.string().length(3),
 });
 export type CreateSettlementInput = z.infer<typeof createSettlementSchema>;
+
+/**
+ * Checklist: event-mode ledgers only (enforced in application code — see
+ * the ChecklistItem model comment in schema.prisma).
+ */
+
+export const createChecklistItemSchema = z.object({
+  title: z.string().min(1).max(140),
+  assignedToId: z.string().uuid().optional(),
+  dueDate: z.string().datetime().optional(),
+});
+export type CreateChecklistItemInput = z.infer<typeof createChecklistItemSchema>;
+
+export const editChecklistItemSchema = z.object({
+  title: z.string().min(1).max(140).optional(),
+  isDone: z.boolean().optional(),
+  assignedToId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+});
+export type EditChecklistItemInput = z.infer<typeof editChecklistItemSchema>;

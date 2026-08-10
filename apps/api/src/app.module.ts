@@ -11,6 +11,8 @@ import { SettlementsModule } from './settlements/settlements.module';
 import { ActivityModule } from './activity/activity.module';
 import { ReputationModule } from './reputation/reputation.module';
 import { DebtSimplificationModule } from './debt-simplification/debt-simplification.module';
+import { ChecklistModule } from './checklist/checklist.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { DebtSimplificationModule } from './debt-simplification/debt-simplificat
     ActivityModule,
     ReputationModule,
     DebtSimplificationModule,
+    ChecklistModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService],

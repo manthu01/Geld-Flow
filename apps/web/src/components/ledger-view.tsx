@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { GlassCard } from "@/components/glass-card";
 import { ExpenseForm } from "@/components/expense-form";
+import { ChecklistPanel } from "@/components/checklist-panel";
+import { TripStatsPanel } from "@/components/trip-stats-panel";
+import { TelegramConnect } from "@/components/telegram-connect";
 import { useAuth } from "@/lib/auth-context";
 import {
   confirmSettlement,
@@ -215,6 +218,12 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
       </div>
 
       {actionError && <p className="text-sm text-owes">{actionError}</p>}
+
+      {ledger.type !== "personal" && <TelegramConnect ledgerId={ledgerId} />}
+
+      {ledger.type === "group_travel" && (
+        <TripStatsPanel expenses={expenses} currency={ledger.baseCurrency} />
+      )}
 
       <section className="space-y-3">
         <h2 className="font-display text-lg font-medium">Balances</h2>
@@ -461,6 +470,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
           </div>
         )}
       </section>
+
+      {ledger.type === "group_event" && (
+        <ChecklistPanel ledgerId={ledgerId} members={ledger.members} />
+      )}
 
       <section className="space-y-3">
         <h2 className="font-display text-lg font-medium">Activity</h2>

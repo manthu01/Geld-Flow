@@ -341,3 +341,67 @@ export async function getDebtSimplification(
 ): Promise<SimplifiedTransfer[]> {
   return parseJson(await authFetch(`/ledgers/${ledgerId}/debt-simplification`));
 }
+
+// ----------------------------------------------------------------- Checklist
+
+export interface ChecklistItemView {
+  id: string;
+  ledgerId: string;
+  title: string;
+  isDone: boolean;
+  assignedToId: string | null;
+  dueDate: string | null;
+  createdById: string;
+  createdAt: string;
+  assignedTo: { id: string; name: string; avatarUrl: string | null } | null;
+}
+
+export async function listChecklist(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<ChecklistItemView[]> {
+  return parseJson(await authFetch(`/ledgers/${ledgerId}/checklist`));
+}
+
+export async function createChecklistItem(
+  authFetch: AuthFetch,
+  ledgerId: string,
+  input: { title: string; assignedToId?: string; dueDate?: string },
+): Promise<ChecklistItemView> {
+  return parseJson(await postJson(authFetch, `/ledgers/${ledgerId}/checklist`, input));
+}
+
+export async function editChecklistItem(
+  authFetch: AuthFetch,
+  itemId: string,
+  input: { title?: string; isDone?: boolean; assignedToId?: string | null; dueDate?: string | null },
+): Promise<ChecklistItemView> {
+  const res = await authFetch(`/checklist/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return parseJson(res);
+}
+
+export async function deleteChecklistItem(
+  authFetch: AuthFetch,
+  itemId: string,
+): Promise<{ id: string }> {
+  const res = await authFetch(`/checklist/${itemId}`, { method: "DELETE" });
+  return parseJson(res);
+}
+
+// ------------------------------------------------------------------ Telegram
+
+export async function getTelegramStatus(
+  authFetch: AuthFetch,
+): Promise<{ configured: boolean; botUsername: string | null }> {
+  return parseJson(await authFetch("/telegram/status"));
+}
+
+export async function createTelegramLinkCode(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<{ code: string; botUsername: string | null; expiresInMinutes: number }> {
+  return parseJson(await postJson(authFetch, `/ledgers/${ledgerId}/telegram-link`));
+}

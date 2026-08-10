@@ -79,19 +79,20 @@ model User {
   authIdentities    AuthIdentity[]
   refreshTokens     RefreshToken[]
   ledgerMembers     LedgerMember[]
-  createdLedgers    Ledger[]        @relation("LedgerCreatedBy")
+  createdLedgers    Ledger[]           @relation("LedgerCreatedBy")
   createdInvites    Invite[]
-  expensesPaid      Expense[]       @relation("ExpensePaidBy")
-  expensesCreated   Expense[]       @relation("ExpenseCreatedBy")
+  expensesPaid      Expense[]          @relation("ExpensePaidBy")
+  expensesCreated   Expense[]          @relation("ExpenseCreatedBy")
   expenseShares     ExpenseShare[]
-  settlementsFrom   Settlement[]    @relation("SettlementFrom")
-  settlementsTo     Settlement[]    @relation("SettlementTo")
+  settlementsFrom   Settlement[]       @relation("SettlementFrom")
+  settlementsTo     Settlement[]       @relation("SettlementTo")
   activityEvents    ActivityEvent[]
   score             UserScore?
   badges            UserBadge[]
-  checklistAssigned ChecklistItem[] @relation("ChecklistAssignedTo")
-  checklistCreated  ChecklistItem[] @relation("ChecklistCreatedBy")
+  checklistAssigned ChecklistItem[]    @relation("ChecklistAssignedTo")
+  checklistCreated  ChecklistItem[]    @relation("ChecklistCreatedBy")
   chatLinks         ChatLink[]
+  telegramLinkCodes TelegramLinkCode[]
 
   @@map("users")
 }
@@ -146,30 +147,31 @@ model RefreshToken {
 // exactly one ledgerId — that scoping is what keeps a group debt and a
 // personal debt between the same two people from ever being summed.
 model Ledger {
-  id           String     @id @default(uuid())
-  type         LedgerType
-  name         String?
-  baseCurrency String     @map("base_currency") @db.Char(3)
-  createdById  String     @map("created_by")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  archivedAt   DateTime?  @map("archived_at")
+  id              String     @id @default(uuid())
+  type            LedgerType
+  name            String?
+  baseCurrency    String     @map("base_currency") @db.Char(3)
+  createdById     String     @map("created_by")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  archivedAt      DateTime?  @map("archived_at")
   // Set only when type = personal, normalized so personalUserAId is
   // always the lexicographically smaller user id. This is what lets a
   // partial unique index cap a friend pair at exactly one personal
   // ledger — see the raw-SQL index added in the migration that
   // introduces these columns, since Prisma's schema DSL has no partial
   // (WHERE-clause) unique constraints.
-  personalUserAId String? @map("personal_user_a_id")
-  personalUserBId String? @map("personal_user_b_id")
+  personalUserAId String?    @map("personal_user_a_id")
+  personalUserBId String?    @map("personal_user_b_id")
 
-  createdBy      User            @relation("LedgerCreatedBy", fields: [createdById], references: [id])
-  members        LedgerMember[]
-  invites        Invite[]
-  expenses       Expense[]
-  settlements    Settlement[]
-  activityEvents ActivityEvent[]
-  checklistItems ChecklistItem[]
-  chatLinks      ChatLink[]
+  createdBy         User               @relation("LedgerCreatedBy", fields: [createdById], references: [id])
+  members           LedgerMember[]
+  invites           Invite[]
+  expenses          Expense[]
+  settlements       Settlement[]
+  activityEvents    ActivityEvent[]
+  checklistItems    ChecklistItem[]
+  chatLinks         ChatLink[]
+  telegramLinkCodes TelegramLinkCode[]
 
   @@map("ledgers")
 }
@@ -368,4 +370,23 @@ model ChatLink {
 
   @@unique([platform, externalChatId])
   @@map("chat_links")
+}
+
+// Short-lived, single-use code shown on a ledger's page and redeemed via
+// "/link CODE" in Telegram to create that ledger's ChatLink — the same
+// generate-a-token-then-redeem-it shape as MagicLinkToken and Invite.
+model TelegramLinkCode {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  ledgerId    String    @map("ledger_id")
+  createdById String    @map("created_by")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  ledger    Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  @@index([ledgerId])
+  @@map("telegram_link_codes")
 }
