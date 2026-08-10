@@ -1,0 +1,411 @@
+"use client";
+
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { GlassCard } from "@/components/glass-card";
+import { ExpenseForm } from "@/components/expense-form";
+import { useAuth } from "@/lib/auth-context";
+import {
+  confirmSettlement,
+  createInvite,
+  declineSettlement,
+  deleteExpense,
+  getBalances,
+  getLedgerDetail,
+  listActivity,
+  listExpenses,
+  listSettlements,
+  requestSettlement,
+  type ActivityEventView,
+  type ExpenseView,
+  type LedgerDetail,
+  type MemberBalance,
+  type SettlementView,
+} from "@/lib/api";
+
+const GROUP_TYPE_LABELS: Record<string, string> = {
+  group_general: "General group",
+  group_travel: "Travel group",
+  group_event: "Event group",
+  personal: "Personal ledger",
+};
+
+function describeActivity(event: ActivityEventView): string {
+  const actor = event.actor.name;
+  switch (event.type) {
+    case "expense_added":
+      return `${actor} added "${event.payload.description ?? "an expense"}"`;
+    case "expense_edited":
+      return `${actor} edited "${event.payload.description ?? "an expense"}"`;
+    case "expense_deleted":
+      return `${actor} deleted "${event.payload.description ?? "an expense"}"`;
+    case "settlement_requested":
+      return `${actor} recorded a payment of ${event.payload.amount ?? ""}`;
+    case "settlement_confirmed":
+      return `${actor} confirmed a payment of ${event.payload.amount ?? ""}`;
+    case "settlement_declined":
+      return `${actor} declined a settlement`;
+    case "member_joined":
+      return `${actor} joined the ledger`;
+    default:
+      return `${actor} — ${event.type}`;
+  }
+}
+
+export function LedgerView({ ledgerId }: { ledgerId: string }) {
+  const { user, authFetch } = useAuth();
+
+  const [ledger, setLedger] = useState<LedgerDetail | null>(null);
+  const [balances, setBalances] = useState<MemberBalance[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseView[]>([]);
+  const [activity, setActivity] = useState<ActivityEventView[]>([]);
+  const [settlements, setSettlements] = useState<SettlementView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseView | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [settleTarget, setSettleTarget] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [ledgerData, balanceData, expenseData, activityData, settlementData] =
+        await Promise.all([
+          getLedgerDetail(authFetch, ledgerId),
+          getBalances(authFetch, ledgerId),
+          listExpenses(authFetch, ledgerId),
+          listActivity(authFetch, ledgerId),
+          listSettlements(authFetch, ledgerId),
+        ]);
+      setLedger(ledgerData);
+      setBalances(balanceData);
+      setExpenses(expenseData.items);
+      setActivity(activityData.items);
+      setSettlements(settlementData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load this ledger.");
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch, ledgerId]);
+
+  useEffect(() => {
+    // Data fetch on mount, not a render-loop synchronization — the rule's
+    // false-positive case for this pattern (see auth-context.tsx history).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function handleInvite() {
+    setActionError(null);
+    try {
+      const { inviteUrl } = await createInvite(authFetch, ledgerId);
+      setInviteUrl(inviteUrl);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not create an invite.");
+    }
+  }
+
+  async function handleDelete(expense: ExpenseView) {
+    if (!window.confirm(`Delete "${expense.description}"?`)) return;
+    setActionError(null);
+    try {
+      await deleteExpense(authFetch, expense.id);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not delete that expense.");
+    }
+  }
+
+  async function handleSettleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!settleTarget || !ledger) return;
+    const form = new FormData(event.currentTarget);
+    setActionError(null);
+    try {
+      await requestSettlement(authFetch, ledgerId, {
+        toUserId: settleTarget,
+        amount: Number(form.get("amount")),
+        currency: ledger.baseCurrency,
+      });
+      setSettleTarget(null);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not record that payment.");
+    }
+  }
+
+  async function handleConfirmSettlement(id: string) {
+    setActionError(null);
+    try {
+      await confirmSettlement(authFetch, id);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not confirm that payment.");
+    }
+  }
+
+  async function handleDeclineSettlement(id: string) {
+    setActionError(null);
+    try {
+      await declineSettlement(authFetch, id);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not decline that payment.");
+    }
+  }
+
+  if (loading) {
+    return <p className="text-sm text-ink-soft">Loading ledger…</p>;
+  }
+  if (error || !ledger) {
+    return <p className="text-sm text-owes">{error ?? "Ledger not found."}</p>;
+  }
+
+  const canManage = ledger.myRole === "owner" || ledger.myRole === "admin";
+  const memberById = new Map(ledger.members.map((m) => [m.userId, m.user]));
+  const pendingForMe = settlements.filter(
+    (s) => s.status === "pending" && s.toUserId === user?.id,
+  );
+
+  return (
+    <div className="w-full max-w-2xl space-y-8">
+      <div className="space-y-1">
+        <Link href="/" className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink">
+          ← All ledgers
+        </Link>
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
+            {ledger.name ?? GROUP_TYPE_LABELS[ledger.type]}
+          </h1>
+          <span className="font-mono text-xs text-ink-soft">
+            {GROUP_TYPE_LABELS[ledger.type]}
+          </span>
+        </div>
+      </div>
+
+      {actionError && <p className="text-sm text-owes">{actionError}</p>}
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium">Balances</h2>
+        <GlassCard className="divide-y divide-surface-border p-0">
+          {balances.map((b) => (
+            <div key={b.userId} className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-ink">
+                {b.userId === user?.id ? "You" : b.name}
+              </span>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`font-mono text-sm font-medium ${
+                    b.netBalance > 0
+                      ? "text-owed"
+                      : b.netBalance < 0
+                        ? "text-owes"
+                        : "text-ink-soft"
+                  }`}
+                >
+                  {b.netBalance > 0 ? "+" : ""}
+                  {b.netBalance.toFixed(2)} {ledger.baseCurrency}
+                </span>
+                {b.userId !== user?.id && (
+                  <button
+                    onClick={() => setSettleTarget(b.userId)}
+                    className="text-xs text-accent-strong underline underline-offset-2"
+                  >
+                    Settle up
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </GlassCard>
+      </section>
+
+      {pendingForMe.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-medium">Awaiting your confirmation</h2>
+          {pendingForMe.map((s) => (
+            <GlassCard key={s.id} className="flex items-center justify-between p-4">
+              <span className="text-sm text-ink">
+                {memberById.get(s.fromUserId)?.name ?? "Someone"} says they paid you{" "}
+                <span className="font-mono">{s.amount} {s.currency}</span>
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleConfirmSettlement(s.id)}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-strong"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => handleDeclineSettlement(s.id)}
+                  className="rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong"
+                >
+                  Decline
+                </button>
+              </div>
+            </GlassCard>
+          ))}
+        </section>
+      )}
+
+      {settleTarget && (
+        <GlassCard className="space-y-3 p-5">
+          <form onSubmit={handleSettleSubmit} className="space-y-3">
+            <p className="text-sm text-ink">
+              Record a payment to{" "}
+              <span className="font-medium">{memberById.get(settleTarget)?.name}</span>
+            </p>
+            <input
+              name="amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              placeholder="0.00"
+              className="w-32 rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-strong"
+              >
+                Record payment
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettleTarget(null)}
+                className="rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-ink hover:bg-surface-strong"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </GlassCard>
+      )}
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-lg font-medium">Expenses</h2>
+          <div className="flex gap-2">
+            {ledger.type !== "personal" && canManage && (
+              <button
+                onClick={handleInvite}
+                className="rounded-lg border border-surface-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong"
+              >
+                Invite
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setShowAddExpense((v) => !v);
+                setEditingExpense(null);
+              }}
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-strong"
+            >
+              Add expense
+            </button>
+          </div>
+        </div>
+
+        {inviteUrl && (
+          <p className="break-all text-xs text-ink-soft">
+            Share this link: <span className="text-accent-strong">{inviteUrl}</span>
+          </p>
+        )}
+
+        {showAddExpense && (
+          <ExpenseForm
+            ledgerId={ledgerId}
+            currency={ledger.baseCurrency}
+            members={ledger.members}
+            onSaved={async () => {
+              setShowAddExpense(false);
+              await load();
+            }}
+            onCancel={() => setShowAddExpense(false)}
+          />
+        )}
+
+        {editingExpense && (
+          <ExpenseForm
+            ledgerId={ledgerId}
+            currency={ledger.baseCurrency}
+            members={ledger.members}
+            initial={editingExpense}
+            onSaved={async () => {
+              setEditingExpense(null);
+              await load();
+            }}
+            onCancel={() => setEditingExpense(null)}
+          />
+        )}
+
+        {expenses.length === 0 ? (
+          <p className="text-sm text-ink-soft">No expenses yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {expenses.map((e) => {
+              const canEdit = canManage || e.createdById === user?.id;
+              return (
+                <GlassCard key={e.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-ink">{e.description}</p>
+                      <p className="text-xs text-ink-soft">
+                        {e.paidBy.name} paid · {e.splitType}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-sm text-ink">
+                        {e.amount} {e.currency}
+                      </span>
+                      {canEdit && (
+                        <div className="flex gap-2 text-xs">
+                          <button
+                            onClick={() => {
+                              setEditingExpense(e);
+                              setShowAddExpense(false);
+                            }}
+                            className="text-accent-strong underline underline-offset-2"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(e)}
+                            className="text-owes underline underline-offset-2"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </GlassCard>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-medium">Activity</h2>
+        {activity.length === 0 ? (
+          <p className="text-sm text-ink-soft">No activity yet.</p>
+        ) : (
+          <GlassCard className="divide-y divide-surface-border p-0">
+            {activity.map((event) => (
+              <div key={event.id} className="px-4 py-3 text-sm text-ink-soft">
+                {describeActivity(event)}
+              </div>
+            ))}
+          </GlassCard>
+        )}
+      </section>
+    </div>
+  );
+}

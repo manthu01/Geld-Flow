@@ -153,6 +153,14 @@ model Ledger {
   createdById  String     @map("created_by")
   createdAt    DateTime   @default(now()) @map("created_at")
   archivedAt   DateTime?  @map("archived_at")
+  // Set only when type = personal, normalized so personalUserAId is
+  // always the lexicographically smaller user id. This is what lets a
+  // partial unique index cap a friend pair at exactly one personal
+  // ledger — see the raw-SQL index added in the migration that
+  // introduces these columns, since Prisma's schema DSL has no partial
+  // (WHERE-clause) unique constraints.
+  personalUserAId String? @map("personal_user_a_id")
+  personalUserBId String? @map("personal_user_b_id")
 
   createdBy      User            @relation("LedgerCreatedBy", fields: [createdById], references: [id])
   members        LedgerMember[]
@@ -166,10 +174,6 @@ model Ledger {
   @@map("ledgers")
 }
 
-// NOTE: a partial unique index capping personal ledgers at one per
-// (least(userA), greatest(userB)) friend pair can't be expressed in the
-// Prisma schema DSL (no partial/conditional unique constraints). It's
-// added as raw SQL in the first migration instead — see Phase 1.
 model LedgerMember {
   ledgerId String     @map("ledger_id")
   userId   String     @map("user_id")

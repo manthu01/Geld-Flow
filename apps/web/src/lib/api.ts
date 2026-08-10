@@ -49,3 +49,257 @@ export async function refreshSession(): Promise<RefreshResponse | null> {
 export async function logoutSession(): Promise<void> {
   await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" });
 }
+
+/**
+ * Everything below talks to the ledger-scoped API and needs an
+ * authenticated request. `authFetch` (from useAuth()) attaches the
+ * bearer token and retries once after a session restore on a 401.
+ */
+export type AuthFetch = (path: string, init?: RequestInit) => Promise<Response>;
+
+async function parseJson<T>(res: Response): Promise<T> {
+  const data: unknown = await res.json();
+  if (!res.ok) {
+    throw new Error(readErrorMessage(data));
+  }
+  return data as T;
+}
+
+function postJson(authFetch: AuthFetch, path: string, body?: unknown) {
+  return authFetch(path, {
+    method: "POST",
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+// ---------------------------------------------------------------- Ledgers
+
+export interface LedgerMemberView {
+  userId: string;
+  role: "owner" | "admin" | "member";
+  joinedAt: string;
+  user: { id: string; name: string; email: string; avatarUrl: string | null };
+}
+
+export interface LedgerSummary {
+  id: string;
+  type: "group_general" | "group_travel" | "group_event" | "personal";
+  name: string | null;
+  baseCurrency: string;
+  createdById: string;
+  createdAt: string;
+  archivedAt: string | null;
+  myRole: "owner" | "admin" | "member";
+  _count?: { members: number };
+  members: LedgerMemberView[];
+}
+
+export type LedgerDetail = LedgerSummary;
+
+export async function listMyLedgers(
+  authFetch: AuthFetch,
+): Promise<{ groups: LedgerSummary[]; personal: LedgerSummary[] }> {
+  return parseJson(await authFetch("/ledgers"));
+}
+
+export async function createGroupLedger(
+  authFetch: AuthFetch,
+  input: { type: "group_general" | "group_travel" | "group_event"; name?: string; baseCurrency: string },
+): Promise<LedgerSummary> {
+  return parseJson(await postJson(authFetch, "/ledgers", input));
+}
+
+export async function getOrCreatePersonalLedger(
+  authFetch: AuthFetch,
+  input: { peerEmail: string; baseCurrency: string },
+): Promise<LedgerSummary> {
+  return parseJson(await postJson(authFetch, "/ledgers/personal", input));
+}
+
+export async function getLedgerDetail(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<LedgerDetail> {
+  return parseJson(await authFetch(`/ledgers/${ledgerId}`));
+}
+
+export async function createInvite(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<{ inviteUrl: string }> {
+  return parseJson(await postJson(authFetch, `/ledgers/${ledgerId}/invites`, {}));
+}
+
+export async function redeemInvite(
+  authFetch: AuthFetch,
+  token: string,
+): Promise<{ ledgerId: string; alreadyMember: boolean }> {
+  return parseJson(await postJson(authFetch, `/invites/${token}/redeem`));
+}
+
+// --------------------------------------------------------------- Expenses
+
+export interface ExpenseShareView {
+  userId: string;
+  shareAmount: string;
+  sharePercentage: string | null;
+  user: { id: string; name: string; avatarUrl: string | null };
+}
+
+export interface ExpenseView {
+  id: string;
+  ledgerId: string;
+  description: string;
+  amount: string;
+  currency: string;
+  paidByUserId: string;
+  splitType: "equal" | "percentage" | "exact";
+  category: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  paidBy: { id: string; name: string; avatarUrl: string | null };
+  createdBy: { id: string; name: string; avatarUrl: string | null };
+  shares: ExpenseShareView[];
+}
+
+export interface ExpenseShareInput {
+  userId: string;
+  amount?: number;
+  percentage?: number;
+}
+
+export interface ExpenseInput {
+  ledgerId: string;
+  description: string;
+  amount: number;
+  currency: string;
+  paidByUserId: string;
+  splitType: "equal" | "percentage" | "exact";
+  category?: string;
+  shares: ExpenseShareInput[];
+}
+
+export async function listExpenses(
+  authFetch: AuthFetch,
+  ledgerId: string,
+  page = 1,
+  pageSize = 30,
+): Promise<{ items: ExpenseView[]; total: number; page: number; pageSize: number }> {
+  return parseJson(
+    await authFetch(`/ledgers/${ledgerId}/expenses?page=${page}&pageSize=${pageSize}`),
+  );
+}
+
+export async function createExpense(
+  authFetch: AuthFetch,
+  input: ExpenseInput,
+): Promise<ExpenseView> {
+  return parseJson(
+    await postJson(authFetch, `/ledgers/${input.ledgerId}/expenses`, input),
+  );
+}
+
+export async function editExpense(
+  authFetch: AuthFetch,
+  expenseId: string,
+  input: Omit<ExpenseInput, "ledgerId">,
+): Promise<ExpenseView> {
+  const res = await authFetch(`/expenses/${expenseId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return parseJson(res);
+}
+
+export async function deleteExpense(
+  authFetch: AuthFetch,
+  expenseId: string,
+): Promise<{ id: string }> {
+  const res = await authFetch(`/expenses/${expenseId}`, { method: "DELETE" });
+  return parseJson(res);
+}
+
+// --------------------------------------------------------------- Balances
+
+export interface MemberBalance {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  netBalance: number;
+}
+
+export async function getBalances(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<MemberBalance[]> {
+  return parseJson(await authFetch(`/ledgers/${ledgerId}/balances`));
+}
+
+// ------------------------------------------------------------ Settlements
+
+export interface SettlementView {
+  id: string;
+  ledgerId: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: string;
+  currency: string;
+  status: "pending" | "confirmed" | "declined";
+  createdAt: string;
+  confirmedAt: string | null;
+}
+
+export async function listSettlements(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<SettlementView[]> {
+  return parseJson(await authFetch(`/ledgers/${ledgerId}/settlements`));
+}
+
+export async function requestSettlement(
+  authFetch: AuthFetch,
+  ledgerId: string,
+  input: { toUserId: string; amount: number; currency: string },
+): Promise<SettlementView> {
+  return parseJson(
+    await postJson(authFetch, `/ledgers/${ledgerId}/settlements`, input),
+  );
+}
+
+export async function confirmSettlement(
+  authFetch: AuthFetch,
+  settlementId: string,
+): Promise<SettlementView> {
+  return parseJson(await postJson(authFetch, `/settlements/${settlementId}/confirm`));
+}
+
+export async function declineSettlement(
+  authFetch: AuthFetch,
+  settlementId: string,
+): Promise<SettlementView> {
+  return parseJson(await postJson(authFetch, `/settlements/${settlementId}/decline`));
+}
+
+// --------------------------------------------------------------- Activity
+
+export interface ActivityEventView {
+  id: string;
+  ledgerId: string;
+  actorId: string;
+  type: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  actor: { id: string; name: string; avatarUrl: string | null };
+}
+
+export async function listActivity(
+  authFetch: AuthFetch,
+  ledgerId: string,
+  page = 1,
+  pageSize = 30,
+): Promise<{ items: ActivityEventView[]; total: number; page: number; pageSize: number }> {
+  return parseJson(
+    await authFetch(`/ledgers/${ledgerId}/activity?page=${page}&pageSize=${pageSize}`),
+  );
+}

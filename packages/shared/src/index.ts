@@ -80,26 +80,65 @@ const expenseObjectSchema = z.object({
   shares: z.array(expenseShareInput).min(1),
 });
 
-function refineSplitShares<T extends z.ZodTypeAny>(schema: T) {
-  return schema
-    .refine(
-      (val: z.infer<typeof expenseObjectSchema>) =>
-        val.splitType !== "exact" ||
-        val.shares.every((s) => typeof s.amount === "number"),
-      { message: "Exact splits require an amount on every share." },
-    )
-    .refine(
-      (val: z.infer<typeof expenseObjectSchema>) =>
-        val.splitType !== "percentage" ||
-        val.shares.every((s) => typeof s.percentage === "number"),
-      { message: "Percentage splits require a percentage on every share." },
-    );
-}
-
-export const createExpenseSchema = refineSplitShares(expenseObjectSchema);
+export const createExpenseSchema = expenseObjectSchema
+  .refine(
+    (val) =>
+      val.splitType !== "exact" ||
+      val.shares.every((s) => typeof s.amount === "number"),
+    { message: "Exact splits require an amount on every share." },
+  )
+  .refine(
+    (val) =>
+      val.splitType !== "percentage" ||
+      val.shares.every((s) => typeof s.percentage === "number"),
+    { message: "Percentage splits require a percentage on every share." },
+  );
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
-export const editExpenseSchema = refineSplitShares(
-  expenseObjectSchema.partial({ ledgerId: true, paidByUserId: true }),
-);
+export const editExpenseSchema = expenseObjectSchema
+  .partial({ ledgerId: true, paidByUserId: true })
+  .refine(
+    (val) =>
+      val.splitType !== "exact" ||
+      val.shares.every((s) => typeof s.amount === "number"),
+    { message: "Exact splits require an amount on every share." },
+  )
+  .refine(
+    (val) =>
+      val.splitType !== "percentage" ||
+      val.shares.every((s) => typeof s.percentage === "number"),
+    { message: "Percentage splits require a percentage on every share." },
+  );
 export type EditExpenseInput = z.infer<typeof editExpenseSchema>;
+
+/**
+ * Ledgers: creating a group, inviting into one, and the personal-ledger
+ * get-or-create (there is never a "create personal ledger" button — it's
+ * always looked up or created lazily for a pair of users).
+ */
+
+export const createInviteSchema = z.object({
+  maxUses: z.number().int().min(1).max(100).default(1),
+  expiresInHours: z.number().int().min(1).max(24 * 30).default(72),
+});
+export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+
+export const getOrCreatePersonalLedgerSchema = z.object({
+  peerEmail: z.string().trim().toLowerCase().email(),
+  baseCurrency: z.string().length(3).default("USD"),
+});
+export type GetOrCreatePersonalLedgerInput = z.infer<
+  typeof getOrCreatePersonalLedgerSchema
+>;
+
+/**
+ * Settlements. Only a "confirmed" settlement affects a balance — see the
+ * settlement model comment in schema.prisma.
+ */
+
+export const createSettlementSchema = z.object({
+  toUserId: z.string().uuid(),
+  amount: z.number().positive(),
+  currency: z.string().length(3),
+});
+export type CreateSettlementInput = z.infer<typeof createSettlementSchema>;
