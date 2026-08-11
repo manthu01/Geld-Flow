@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import {
   requestMagicLinkSchema,
   type RequestMagicLinkInput,
@@ -65,6 +66,7 @@ export class AuthController {
   // ---------------------------------------------------------- Magic link
 
   @Post('magic-link')
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
   async requestMagicLink(
     @Body(new ZodValidationPipe(requestMagicLinkSchema))
     body: RequestMagicLinkInput,
