@@ -3,7 +3,6 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
-import { GooeyOrbs } from "@/components/gooey-orbs";
 import { API_URL, requestMagicLink } from "@/lib/api";
 
 function LoginError() {
@@ -41,7 +40,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <div className="flex justify-center">
-            <GooeyOrbs />
+            {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
+            <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-14 w-14 rounded-2xl" />
           </div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">
             Sign in to Geld Flow
@@ -90,7 +90,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={status === "sending"}
-                className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-60"
+                className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
               >
                 {status === "sending" ? "Sending…" : "Send sign-in link"}
               </button>
@@ -105,7 +105,7 @@ export default function LoginPage() {
 
           <a
             href={`${API_URL}/auth/google`}
-            className="flex w-full items-center justify-center rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-strong"
+            className="flex w-full items-center justify-center rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
           >
             Continue with Google
           </a>

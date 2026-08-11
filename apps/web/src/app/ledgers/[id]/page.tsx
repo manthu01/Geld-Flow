@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { LedgerView } from "@/components/ledger-view";
+import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 
 export default function LedgerPage() {
@@ -21,8 +22,8 @@ export default function LedgerPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center px-6 py-16">
+    <AppShell title="Ledger">
       <LedgerView ledgerId={params.id} />
-    </main>
+    </AppShell>
   );
 }

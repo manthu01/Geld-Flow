@@ -203,13 +203,13 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
   );
 
   return (
-    <div className="w-full max-w-2xl space-y-8">
+    <div className="animate-fade-in-up w-full max-w-6xl space-y-6">
       <div className="space-y-1">
         <Link href="/" className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink">
           ← All ledgers
         </Link>
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
             {ledger.name ?? GROUP_TYPE_LABELS[ledger.type]}
           </h1>
           <span className="font-mono text-xs text-ink-soft">
@@ -220,276 +220,284 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
 
       {actionError && <p className="text-sm text-owes">{actionError}</p>}
 
-      {ledger.type !== "personal" && <TelegramConnect ledgerId={ledgerId} />}
-
       {ledger.type === "group_travel" && (
         <TripStatsPanel expenses={expenses} currency={ledger.baseCurrency} />
       )}
 
-      <section className="space-y-3">
-        <h2 className="font-display text-lg font-medium">Balances</h2>
-        <GlassCard className="divide-y divide-surface-border p-0">
-          {balances.map((b) => (
-            <div key={b.userId} className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm text-ink">
-                {b.userId === user?.id ? "You" : b.name}{" "}
-                <span className="font-mono text-xs text-ink-soft">
-                  {rankLabel(scores[b.userId])}
-                </span>
-              </span>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`font-mono text-sm font-medium ${
-                    b.netBalance > 0
-                      ? "text-owed"
-                      : b.netBalance < 0
-                        ? "text-owes"
-                        : "text-ink-soft"
-                  }`}
-                >
-                  {b.netBalance > 0 ? "+" : ""}
-                  {b.netBalance.toFixed(2)} {ledger.baseCurrency}
-                </span>
-                {b.userId !== user?.id && (
-                  <button
-                    onClick={() => {
-                      setSettleTarget(b.userId);
-                      setSettleAmountHint("");
-                    }}
-                    className="text-xs text-accent-strong underline underline-offset-2"
-                  >
-                    Settle up
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </GlassCard>
-      </section>
-
-      {debtSuggestions.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-display text-lg font-medium">Simplify debts</h2>
-          <p className="text-xs text-ink-soft">
-            The fewest payments that would settle everyone up.
-          </p>
-          <GlassCard className="divide-y divide-surface-border p-0">
-            {debtSuggestions.map((t, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between px-4 py-3 text-sm text-ink"
-              >
-                <span>
-                  {t.fromUserId === user?.id ? "You" : memberById.get(t.fromUserId)?.name}{" "}
-                  owe{t.fromUserId === user?.id ? "" : "s"}{" "}
-                  {t.toUserId === user?.id ? "you" : memberById.get(t.toUserId)?.name}{" "}
-                  <span className="font-mono">
-                    {t.amount.toFixed(2)} {ledger.baseCurrency}
-                  </span>
-                </span>
-                {t.fromUserId === user?.id && (
-                  <button
-                    onClick={() => {
-                      setSettleTarget(t.toUserId);
-                      setSettleAmountHint(String(t.amount));
-                    }}
-                    className="text-xs text-accent-strong underline underline-offset-2"
-                  >
-                    Settle this
-                  </button>
-                )}
-              </div>
-            ))}
-          </GlassCard>
-        </section>
-      )}
-
-      {pendingForMe.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-display text-lg font-medium">Awaiting your confirmation</h2>
-          {pendingForMe.map((s) => (
-            <GlassCard key={s.id} className="flex items-center justify-between p-4">
-              <span className="text-sm text-ink">
-                {memberById.get(s.fromUserId)?.name ?? "Someone"} says they paid you{" "}
-                <span className="font-mono">{s.amount} {s.currency}</span>
-              </span>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        {/* Main column */}
+        <div className="min-w-0 space-y-8">
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-medium">Expenses</h2>
               <div className="flex gap-2">
+                {ledger.type !== "personal" && canManage && (
+                  <button
+                    onClick={handleInvite}
+                    className="rounded-lg border border-surface-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong active:scale-95"
+                  >
+                    Invite
+                  </button>
+                )}
                 <button
-                  onClick={() => handleConfirmSettlement(s.id)}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-strong"
+                  onClick={() => {
+                    setShowAddExpense((v) => !v);
+                    setEditingExpense(null);
+                  }}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-strong active:scale-95"
                 >
-                  Confirm
-                </button>
-                <button
-                  onClick={() => handleDeclineSettlement(s.id)}
-                  className="rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong"
-                >
-                  Decline
+                  Add expense
                 </button>
               </div>
-            </GlassCard>
-          ))}
-        </section>
-      )}
-
-      {settleTarget && (
-        <GlassCard className="space-y-3 p-5">
-          <form onSubmit={handleSettleSubmit} className="space-y-3">
-            <p className="text-sm text-ink">
-              Record a payment to{" "}
-              <span className="font-medium">{memberById.get(settleTarget)?.name}</span>
-            </p>
-            <input
-              name="amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              required
-              defaultValue={settleAmountHint || undefined}
-              placeholder="0.00"
-              className="w-32 rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-strong"
-              >
-                Record payment
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettleTarget(null)}
-                className="rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-ink hover:bg-surface-strong"
-              >
-                Cancel
-              </button>
             </div>
-          </form>
-        </GlassCard>
-      )}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-medium">Expenses</h2>
-          <div className="flex gap-2">
-            {ledger.type !== "personal" && canManage && (
-              <button
-                onClick={handleInvite}
-                className="rounded-lg border border-surface-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong"
-              >
-                Invite
-              </button>
+            {inviteUrl && (
+              <p className="break-all text-xs text-ink-soft">
+                Share this link: <span className="text-accent-strong">{inviteUrl}</span>
+              </p>
             )}
-            <button
-              onClick={() => {
-                setShowAddExpense((v) => !v);
-                setEditingExpense(null);
-              }}
-              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-strong"
-            >
-              Add expense
-            </button>
-          </div>
+
+            {showAddExpense && (
+              <ExpenseForm
+                ledgerId={ledgerId}
+                currency={ledger.baseCurrency}
+                members={ledger.members}
+                onSaved={async () => {
+                  setShowAddExpense(false);
+                  await load();
+                }}
+                onCancel={() => setShowAddExpense(false)}
+              />
+            )}
+
+            {editingExpense && (
+              <ExpenseForm
+                ledgerId={ledgerId}
+                currency={ledger.baseCurrency}
+                members={ledger.members}
+                initial={editingExpense}
+                onSaved={async () => {
+                  setEditingExpense(null);
+                  await load();
+                }}
+                onCancel={() => setEditingExpense(null)}
+              />
+            )}
+
+            {expenses.length === 0 ? (
+              <EmptyState title="No expenses yet" hint="Add the first one above." />
+            ) : (
+              <div className="space-y-2">
+                {expenses.map((e) => {
+                  const canEdit = canManage || e.createdById === user?.id;
+                  return (
+                    <GlassCard key={e.id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-ink">{e.description}</p>
+                          <p className="text-xs text-ink-soft">
+                            {e.paidBy.name} paid · {e.splitType}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-sm text-ink">
+                            {e.amount} {e.currency}
+                          </span>
+                          {canEdit && (
+                            <div className="flex gap-2 text-xs">
+                              <button
+                                onClick={() => {
+                                  setEditingExpense(e);
+                                  setShowAddExpense(false);
+                                }}
+                                className="text-accent-strong underline underline-offset-2"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(e)}
+                                className="text-owes underline underline-offset-2"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </GlassCard>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {ledger.type === "group_event" && (
+            <ChecklistPanel ledgerId={ledgerId} members={ledger.members} />
+          )}
+
+          <section className="space-y-3">
+            <h2 className="font-display text-lg font-medium">Activity</h2>
+            {activity.length === 0 ? (
+              <EmptyState title="No activity yet" />
+            ) : (
+              <GlassCard className="divide-y divide-surface-border p-0">
+                {activity.map((event) => (
+                  <div key={event.id} className="px-4 py-3 text-sm text-ink-soft">
+                    {describeActivity(event)}
+                  </div>
+                ))}
+              </GlassCard>
+            )}
+          </section>
         </div>
 
-        {inviteUrl && (
-          <p className="break-all text-xs text-ink-soft">
-            Share this link: <span className="text-accent-strong">{inviteUrl}</span>
-          </p>
-        )}
+        {/* Right rail */}
+        <div className="space-y-6 lg:sticky lg:top-20">
+          <section className="space-y-3">
+            <h2 className="font-display text-lg font-medium">Balances</h2>
+            <GlassCard className="divide-y divide-surface-border p-0">
+              {balances.map((b) => (
+                <div key={b.userId} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-ink">
+                    {b.userId === user?.id ? "You" : b.name}{" "}
+                    <span className="font-mono text-xs text-ink-soft">
+                      {rankLabel(scores[b.userId])}
+                    </span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`font-mono text-sm font-medium ${
+                        b.netBalance > 0
+                          ? "text-owed"
+                          : b.netBalance < 0
+                            ? "text-owes"
+                            : "text-ink-soft"
+                      }`}
+                    >
+                      {b.netBalance > 0 ? "+" : ""}
+                      {b.netBalance.toFixed(2)} {ledger.baseCurrency}
+                    </span>
+                    {b.userId !== user?.id && (
+                      <button
+                        onClick={() => {
+                          setSettleTarget(b.userId);
+                          setSettleAmountHint("");
+                        }}
+                        className="text-xs text-accent-strong underline underline-offset-2"
+                      >
+                        Settle up
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </GlassCard>
+          </section>
 
-        {showAddExpense && (
-          <ExpenseForm
-            ledgerId={ledgerId}
-            currency={ledger.baseCurrency}
-            members={ledger.members}
-            onSaved={async () => {
-              setShowAddExpense(false);
-              await load();
-            }}
-            onCancel={() => setShowAddExpense(false)}
-          />
-        )}
-
-        {editingExpense && (
-          <ExpenseForm
-            ledgerId={ledgerId}
-            currency={ledger.baseCurrency}
-            members={ledger.members}
-            initial={editingExpense}
-            onSaved={async () => {
-              setEditingExpense(null);
-              await load();
-            }}
-            onCancel={() => setEditingExpense(null)}
-          />
-        )}
-
-        {expenses.length === 0 ? (
-          <EmptyState title="No expenses yet" hint="Add the first one above." />
-        ) : (
-          <div className="space-y-2">
-            {expenses.map((e) => {
-              const canEdit = canManage || e.createdById === user?.id;
-              return (
-                <GlassCard key={e.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-ink">{e.description}</p>
-                      <p className="text-xs text-ink-soft">
-                        {e.paidBy.name} paid · {e.splitType}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm text-ink">
-                        {e.amount} {e.currency}
+          {debtSuggestions.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="font-display text-lg font-medium">Simplify debts</h2>
+              <p className="text-xs text-ink-soft">
+                The fewest payments that would settle everyone up.
+              </p>
+              <GlassCard className="divide-y divide-surface-border p-0">
+                {debtSuggestions.map((t, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between px-4 py-3 text-sm text-ink"
+                  >
+                    <span>
+                      {t.fromUserId === user?.id ? "You" : memberById.get(t.fromUserId)?.name}{" "}
+                      owe{t.fromUserId === user?.id ? "" : "s"}{" "}
+                      {t.toUserId === user?.id ? "you" : memberById.get(t.toUserId)?.name}{" "}
+                      <span className="font-mono">
+                        {t.amount.toFixed(2)} {ledger.baseCurrency}
                       </span>
-                      {canEdit && (
-                        <div className="flex gap-2 text-xs">
-                          <button
-                            onClick={() => {
-                              setEditingExpense(e);
-                              setShowAddExpense(false);
-                            }}
-                            className="text-accent-strong underline underline-offset-2"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(e)}
-                            className="text-owes underline underline-offset-2"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    </span>
+                    {t.fromUserId === user?.id && (
+                      <button
+                        onClick={() => {
+                          setSettleTarget(t.toUserId);
+                          setSettleAmountHint(String(t.amount));
+                        }}
+                        className="text-xs text-accent-strong underline underline-offset-2"
+                      >
+                        Settle this
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </GlassCard>
+            </section>
+          )}
+
+          {pendingForMe.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="font-display text-lg font-medium">Awaiting your confirmation</h2>
+              {pendingForMe.map((s) => (
+                <GlassCard key={s.id} className="flex items-center justify-between p-4">
+                  <span className="text-sm text-ink">
+                    {memberById.get(s.fromUserId)?.name ?? "Someone"} says they paid you{" "}
+                    <span className="font-mono">{s.amount} {s.currency}</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleConfirmSettlement(s.id)}
+                      className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-strong active:scale-95"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => handleDeclineSettlement(s.id)}
+                      className="rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong active:scale-95"
+                    >
+                      Decline
+                    </button>
                   </div>
                 </GlassCard>
-              );
-            })}
-          </div>
-        )}
-      </section>
+              ))}
+            </section>
+          )}
 
-      {ledger.type === "group_event" && (
-        <ChecklistPanel ledgerId={ledgerId} members={ledger.members} />
-      )}
+          {settleTarget && (
+            <GlassCard className="space-y-3 p-5">
+              <form onSubmit={handleSettleSubmit} className="space-y-3">
+                <p className="text-sm text-ink">
+                  Record a payment to{" "}
+                  <span className="font-medium">{memberById.get(settleTarget)?.name}</span>
+                </p>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  defaultValue={settleAmountHint || undefined}
+                  placeholder="0.00"
+                  className="w-32 rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-strong active:scale-95"
+                  >
+                    Record payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettleTarget(null)}
+                    className="rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-ink hover:bg-surface-strong active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </GlassCard>
+          )}
 
-      <section className="space-y-3">
-        <h2 className="font-display text-lg font-medium">Activity</h2>
-        {activity.length === 0 ? (
-          <EmptyState title="No activity yet" />
-        ) : (
-          <GlassCard className="divide-y divide-surface-border p-0">
-            {activity.map((event) => (
-              <div key={event.id} className="px-4 py-3 text-sm text-ink-soft">
-                {describeActivity(event)}
-              </div>
-            ))}
-          </GlassCard>
-        )}
-      </section>
+          {ledger.type !== "personal" && <TelegramConnect ledgerId={ledgerId} />}
+        </div>
+      </div>
     </div>
   );
 }

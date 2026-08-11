@@ -28,12 +28,22 @@ function extractInviteToken(input: string): string {
   return match ? match[1] : trimmed;
 }
 
-function LedgerCard({ ledger, subtitle }: { ledger: LedgerSummary; subtitle: string }) {
+function LedgerCard({
+  ledger,
+  subtitle,
+  delayMs = 0,
+}: {
+  ledger: LedgerSummary;
+  subtitle: string;
+  delayMs?: number;
+}) {
   const router = useRouter();
   return (
     <GlassCard
-      className="cursor-pointer p-4"
+      className="animate-fade-in-up cursor-pointer p-4 active:scale-[0.98]"
+      style={{ animationDelay: `${delayMs}ms` }}
       interactive
+      glow
       onClick={() => router.push(`/ledgers/${ledger.id}`)}
     >
       <div className="flex items-center justify-between">
@@ -145,13 +155,10 @@ export function Dashboard() {
   }
 
   return (
-    <div className="w-full max-w-2xl space-y-8">
+    <div className="animate-fade-in-up w-full max-w-6xl space-y-8">
       <div className="space-y-1">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft">
-          Signed in
-        </p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          Welcome back, {user?.name}
+        <h1 className="font-display text-2xl font-semibold tracking-tight">
+          Welcome back, {user?.name?.split(" ")[0]}
         </h1>
         {score && (
           <p className="font-mono text-xs text-ink-soft">
@@ -170,7 +177,7 @@ export function Dashboard() {
             setShowPersonal(false);
             setShowJoin(false);
           }}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95"
         >
           New group
         </button>
@@ -180,7 +187,7 @@ export function Dashboard() {
             setShowNewGroup(false);
             setShowJoin(false);
           }}
-          className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-strong"
+          className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
         >
           Start a personal ledger
         </button>
@@ -190,7 +197,7 @@ export function Dashboard() {
             setShowNewGroup(false);
             setShowPersonal(false);
           }}
-          className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-strong"
+          className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
         >
           Join with invite
         </button>
@@ -220,7 +227,7 @@ export function Dashboard() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-60"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
             >
               {busy ? "Creating…" : "Create group"}
             </button>
@@ -243,7 +250,7 @@ export function Dashboard() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-60"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
             >
               {busy ? "Opening…" : "Open personal ledger"}
             </button>
@@ -264,7 +271,7 @@ export function Dashboard() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-60"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
             >
               {busy ? "Joining…" : "Join"}
             </button>
@@ -282,9 +289,9 @@ export function Dashboard() {
             {groups.length === 0 ? (
               <EmptyState title="No group ledgers yet" hint="Start a trip, event, or tab above." />
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {groups.map((g) => (
-                  <LedgerCard key={g.id} ledger={g} subtitle="Group" />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {groups.map((g, i) => (
+                  <LedgerCard key={g.id} ledger={g} subtitle="Group" delayMs={i * 40} />
                 ))}
               </div>
             )}
@@ -295,14 +302,15 @@ export function Dashboard() {
             {personal.length === 0 ? (
               <EmptyState title="No personal ledgers yet" hint="Open one with a friend's email above." />
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {personal.map((p) => {
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {personal.map((p, i) => {
                   const peer = p.members.find((m) => m.userId !== user?.id);
                   return (
                     <LedgerCard
                       key={p.id}
                       ledger={p}
                       subtitle={peer?.user.name ?? "Personal ledger"}
+                      delayMs={i * 40}
                     />
                   );
                 })}

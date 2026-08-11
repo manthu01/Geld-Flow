@@ -4,7 +4,7 @@ const BADGE_COLORS: Record<string, { primary: string; accent: string }> = {
   "first-steps": { primary: "var(--ink-soft)", accent: "var(--ink)" },
   "group-founder": { primary: "var(--accent-2)", accent: "var(--accent-2-strong)" },
   peacemaker: { primary: "var(--owed)", accent: "var(--owed)" },
-  "first-settlement": { primary: "var(--accent)", accent: "var(--bg-elevated)" },
+  "first-settlement": { primary: "var(--accent-2)", accent: "var(--bg-elevated)" },
   "speedy-settler": { primary: "var(--badge-gold)", accent: "var(--badge-gold)" },
   "reliable-payer": { primary: "var(--owed)", accent: "var(--owed)" },
   legendary: { primary: "var(--badge-gold)", accent: "var(--badge-gold)" },
@@ -22,11 +22,13 @@ export function PixelBadge({
   earned,
   size = 40,
   title,
+  className = "",
 }: {
   iconRef: string;
   earned: boolean;
   size?: number;
   title?: string;
+  className?: string;
 }) {
   const grid = PIXEL_ICONS[iconRef] ?? PIXEL_ICONS["first-steps"];
   const colors = BADGE_COLORS[iconRef] ?? { primary: "var(--accent)", accent: "var(--accent)" };
@@ -39,7 +41,7 @@ export function PixelBadge({
       shapeRendering="crispEdges"
       role="img"
       aria-label={title}
-      className={earned ? "" : "opacity-30 grayscale"}
+      className={`${earned ? "" : "opacity-30 grayscale"} ${className}`}
     >
       {title && <title>{title}</title>}
       {grid.map((row, y) =>

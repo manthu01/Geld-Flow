@@ -232,14 +232,14 @@ export function ExpenseForm({
           <button
             type="submit"
             disabled={busy}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-60"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
           >
             {busy ? "Saving…" : initial ? "Save changes" : "Add expense"}
           </button>
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-strong"
+            className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
           >
             Cancel
           </button>

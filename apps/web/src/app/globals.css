@@ -9,19 +9,24 @@
   --surface-highlight: rgba(255, 255, 255, 0.7);
   --ink: #12151b;
   --ink-soft: #5b6472;
-  --accent: #d9531f;
-  --accent-strong: #b8431a;
-  --accent-tint: rgba(217, 83, 31, 0.12);
+  --accent: #2f6fed;
+  --accent-strong: #1d4fc4;
+  --accent-tint: rgba(47, 111, 237, 0.12);
   --accent-2: #7c5cff;
   --accent-2-strong: #6842e0;
   --accent-2-tint: rgba(124, 92, 255, 0.14);
+  /* Text color to use ON TOP of an --accent-colored surface — white reads
+     fine on the light mode blue, but dark mode's light-gold accent needs
+     dark text instead, so this flips per theme rather than being a fixed
+     white everywhere. */
+  --on-accent: #ffffff;
   --owed: #17915f;
   --owes: #d33a3a;
-  --ring: rgba(217, 83, 31, 0.45);
+  --ring: rgba(47, 111, 237, 0.45);
   --glass-shadow:
     0 1px 2px rgba(15, 23, 42, 0.05),
     0 20px 48px -24px rgba(15, 23, 42, 0.3);
-  --aurora-1: #ffb199;
+  --aurora-1: #8ec5ff;
   --aurora-2: #a78bfa;
   --aurora-3: #5fd8bd;
   --badge-gold: #c99a1e;
@@ -37,19 +42,20 @@
     --surface-highlight: rgba(255, 255, 255, 0.16);
     --ink: #eceef3;
     --ink-soft: #98a2b5;
-    --accent: #ff7a45;
-    --accent-strong: #ffa47a;
-    --accent-tint: rgba(255, 122, 69, 0.16);
+    --accent: #f4c430;
+    --accent-strong: #ffdb58;
+    --accent-tint: rgba(244, 196, 48, 0.18);
     --accent-2: #a78bfa;
     --accent-2-strong: #c4b3ff;
     --accent-2-tint: rgba(167, 139, 250, 0.18);
+    --on-accent: #14110a;
     --owed: #3ddb9b;
     --owes: #ff6b6b;
-    --ring: rgba(255, 122, 69, 0.5);
+    --ring: rgba(244, 196, 48, 0.55);
     --glass-shadow:
       0 1px 2px rgba(0, 0, 0, 0.3),
       0 24px 60px -20px rgba(0, 0, 0, 0.65);
-    --aurora-1: #ff7a45;
+    --aurora-1: #e8b923;
     --aurora-2: #7c5cff;
     --aurora-3: #16b88a;
     --badge-gold: #ffd93d;
@@ -71,6 +77,7 @@
   --color-accent-2: var(--accent-2);
   --color-accent-2-strong: var(--accent-2-strong);
   --color-accent-2-tint: var(--accent-2-tint);
+  --color-on-accent: var(--on-accent);
   --color-owed: var(--owed);
   --color-owes: var(--owes);
   --color-ring: var(--ring);
@@ -182,73 +189,61 @@ body {
   }
 }
 
-/* ------------------------------------------------------------- Gooey orbs */
-/* A small liquid brand mark: three blobs that continuously drift and merge,
-   the "melt together" look coming from an SVG goo filter (blur, then a
-   contrast-boosting color matrix that snaps the blur back to hard edges). */
+/* ---------------------------------------------------------- Mobile drawer */
 
-.gooey-orb {
-  position: absolute;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
-.gooey-orb--1 {
-  top: 6px;
-  left: 6px;
-  width: 28px;
-  height: 28px;
-  animation: gooey-drift-1 6s ease-in-out infinite;
+.animate-slide-in-left {
+  animation: slide-in-left 0.22s ease-out;
 }
 
-.gooey-orb--2 {
-  top: 18px;
-  left: 26px;
-  width: 22px;
-  height: 22px;
-  animation: gooey-drift-2 7s ease-in-out infinite;
+/* ------------------------------------------------------- Entrance motion */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.gooey-orb--3 {
-  top: 2px;
-  left: 30px;
-  width: 18px;
-  height: 18px;
-  animation: gooey-drift-3 5s ease-in-out infinite;
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes gooey-drift-1 {
-  0%,
+@keyframes badge-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.35);
+  }
+  60% {
+    transform: scale(0.92);
+  }
   100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(6px, 4px);
+    transform: scale(1);
   }
 }
 
-@keyframes gooey-drift-2 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(-6px, -4px);
-  }
-}
-
-@keyframes gooey-drift-3 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(-4px, 6px);
-  }
+.animate-badge-pop {
+  animation: badge-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gooey-orb {
+  .animate-fade-in-up,
+  .animate-badge-pop,
+  .animate-slide-in-left {
     animation: none;
   }
 }

@@ -107,7 +107,7 @@ export function ChecklistPanel({
           </select>
           <button
             type="submit"
-            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-strong"
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-strong active:scale-95"
           >
             Add
           </button>

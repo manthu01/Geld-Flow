@@ -2,25 +2,17 @@
 
 import Link from "next/link";
 import { Dashboard } from "@/components/dashboard";
-import { GooeyOrbs } from "@/components/gooey-orbs";
+import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
-  const { status, user, logout } = useAuth();
+  const { status, user } = useAuth();
 
   if (status === "authenticated" && user) {
     return (
-      <main className="flex flex-1 flex-col items-center px-6 py-16">
-        <div className="mb-2 flex w-full max-w-2xl justify-end">
-          <button
-            onClick={() => void logout()}
-            className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink"
-          >
-            Sign out
-          </button>
-        </div>
+      <AppShell title="Dashboard">
         <Dashboard />
-      </main>
+      </AppShell>
     );
   }
 
@@ -28,7 +20,8 @@ export default function Home() {
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="w-full max-w-md space-y-2 text-center">
         <div className="flex justify-center pb-1">
-          <GooeyOrbs />
+          {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
+          <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-16 w-16 rounded-2xl" />
         </div>
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft">
           Geld Flow
