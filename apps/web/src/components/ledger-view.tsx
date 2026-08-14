@@ -8,7 +8,9 @@ import { ChecklistPanel } from "@/components/checklist-panel";
 import { TripStatsPanel } from "@/components/trip-stats-panel";
 import { TelegramConnect } from "@/components/telegram-connect";
 import { EmptyState } from "@/components/empty-state";
+import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
+import { LEDGER_TYPE_LABELS, describeActivity } from "@/lib/activity";
 import {
   confirmSettlement,
   createInvite,
@@ -33,35 +35,6 @@ import {
 
 function rankLabel(score: ScoreView | undefined): string {
   return score ? `Rank ${score.currentRank}` : "";
-}
-
-const GROUP_TYPE_LABELS: Record<string, string> = {
-  group_general: "General group",
-  group_travel: "Travel group",
-  group_event: "Event group",
-  personal: "Personal ledger",
-};
-
-function describeActivity(event: ActivityEventView): string {
-  const actor = event.actor.name;
-  switch (event.type) {
-    case "expense_added":
-      return `${actor} added "${event.payload.description ?? "an expense"}"`;
-    case "expense_edited":
-      return `${actor} edited "${event.payload.description ?? "an expense"}"`;
-    case "expense_deleted":
-      return `${actor} deleted "${event.payload.description ?? "an expense"}"`;
-    case "settlement_requested":
-      return `${actor} recorded a payment of ${event.payload.amount ?? ""}`;
-    case "settlement_confirmed":
-      return `${actor} confirmed a payment of ${event.payload.amount ?? ""}`;
-    case "settlement_declined":
-      return `${actor} declined a settlement`;
-    case "member_joined":
-      return `${actor} joined the ledger`;
-    default:
-      return `${actor} — ${event.type}`;
-  }
 }
 
 export function LedgerView({ ledgerId }: { ledgerId: string }) {
@@ -203,20 +176,20 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
   );
 
   return (
-    <div className="animate-fade-in-up w-full max-w-6xl space-y-6">
-      <div className="space-y-1">
+    <div className="w-full max-w-6xl space-y-6">
+      <Reveal className="space-y-1">
         <Link href="/" className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink">
           ← All ledgers
         </Link>
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-            {ledger.name ?? GROUP_TYPE_LABELS[ledger.type]}
+            {ledger.name ?? LEDGER_TYPE_LABELS[ledger.type]}
           </h1>
           <span className="font-mono text-xs text-ink-soft">
-            {GROUP_TYPE_LABELS[ledger.type]}
+            {LEDGER_TYPE_LABELS[ledger.type]}
           </span>
         </div>
-      </div>
+      </Reveal>
 
       {actionError && <p className="text-sm text-owes">{actionError}</p>}
 
@@ -287,11 +260,12 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
             {expenses.length === 0 ? (
               <EmptyState title="No expenses yet" hint="Add the first one above." />
             ) : (
-              <div className="space-y-2">
+              <StaggerGroup className="space-y-2">
                 {expenses.map((e) => {
                   const canEdit = canManage || e.createdById === user?.id;
                   return (
-                    <GlassCard key={e.id} className="p-4">
+                    <StaggerItem key={e.id}>
+                    <GlassCard interactive className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-ink">{e.description}</p>
@@ -325,9 +299,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                         </div>
                       </div>
                     </GlassCard>
+                    </StaggerItem>
                   );
                 })}
-              </div>
+              </StaggerGroup>
             )}
           </section>
 
@@ -340,12 +315,14 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
             {activity.length === 0 ? (
               <EmptyState title="No activity yet" />
             ) : (
-              <GlassCard className="divide-y divide-surface-border p-0">
-                {activity.map((event) => (
-                  <div key={event.id} className="px-4 py-3 text-sm text-ink-soft">
-                    {describeActivity(event)}
-                  </div>
-                ))}
+              <GlassCard className="p-0">
+                <StaggerGroup className="divide-y divide-surface-border">
+                  {activity.map((event) => (
+                    <StaggerItem key={event.id} className="px-4 py-3 text-sm text-ink-soft">
+                      {describeActivity(event)}
+                    </StaggerItem>
+                  ))}
+                </StaggerGroup>
               </GlassCard>
             )}
           </section>
@@ -355,9 +332,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
         <div className="space-y-6 lg:sticky lg:top-20">
           <section className="space-y-3">
             <h2 className="font-display text-lg font-medium">Balances</h2>
-            <GlassCard className="divide-y divide-surface-border p-0">
+            <GlassCard className="p-0">
+              <StaggerGroup className="divide-y divide-surface-border">
               {balances.map((b) => (
-                <div key={b.userId} className="flex items-center justify-between px-4 py-3">
+                <StaggerItem key={b.userId} className="flex items-center justify-between px-4 py-3">
                   <span className="text-sm text-ink">
                     {b.userId === user?.id ? "You" : b.name}{" "}
                     <span className="font-mono text-xs text-ink-soft">
@@ -389,8 +367,9 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                       </button>
                     )}
                   </div>
-                </div>
+                </StaggerItem>
               ))}
+              </StaggerGroup>
             </GlassCard>
           </section>
 
@@ -400,9 +379,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
               <p className="text-xs text-ink-soft">
                 The fewest payments that would settle everyone up.
               </p>
-              <GlassCard className="divide-y divide-surface-border p-0">
+              <GlassCard className="p-0">
+              <StaggerGroup className="divide-y divide-surface-border">
                 {debtSuggestions.map((t, i) => (
-                  <div
+                  <StaggerItem
                     key={i}
                     className="flex items-center justify-between px-4 py-3 text-sm text-ink"
                   >
@@ -425,8 +405,9 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                         Settle this
                       </button>
                     )}
-                  </div>
+                  </StaggerItem>
                 ))}
+              </StaggerGroup>
               </GlassCard>
             </section>
           )}
@@ -434,8 +415,10 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
           {pendingForMe.length > 0 && (
             <section className="space-y-3">
               <h2 className="font-display text-lg font-medium">Awaiting your confirmation</h2>
+              <StaggerGroup className="space-y-3">
               {pendingForMe.map((s) => (
-                <GlassCard key={s.id} className="flex items-center justify-between p-4">
+                <StaggerItem key={s.id}>
+                <GlassCard className="flex items-center justify-between p-4">
                   <span className="text-sm text-ink">
                     {memberById.get(s.fromUserId)?.name ?? "Someone"} says they paid you{" "}
                     <span className="font-mono">{s.amount} {s.currency}</span>
@@ -455,7 +438,9 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                     </button>
                   </div>
                 </GlassCard>
+                </StaggerItem>
               ))}
+              </StaggerGroup>
             </section>
           )}
 

@@ -1,10 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getMyScore, listMyLedgers, type LedgerSummary, type ScoreView } from "@/lib/api";
+
+const NAV_ITEMS = [
+  { href: "/", label: "Dashboard" },
+  { href: "/personal", label: "Personal" },
+  { href: "/groups", label: "Groups" },
+  { href: "/analysis", label: "Analysis & History" },
+  { href: "/about", label: "About" },
+] as const;
+
+function NavLink({ href, label, onNavigate }: { href: string; label: string; onNavigate: () => void }) {
+  const pathname = usePathname();
+  const active = pathname === href;
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+        active ? "bg-accent-tint text-accent-strong" : "text-ink-soft hover:bg-surface-strong hover:text-ink"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
 
 function NavLedgerLink({ ledger, onNavigate }: { ledger: LedgerSummary; onNavigate: () => void }) {
   const pathname = usePathname();
@@ -24,8 +48,8 @@ function NavLedgerLink({ ledger, onNavigate }: { ledger: LedgerSummary; onNaviga
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
-  const { user, authFetch, logout } = useAuth();
+function useLedgerNav() {
+  const { authFetch } = useAuth();
   const [groups, setGroups] = useState<LedgerSummary[]>([]);
   const [personal, setPersonal] = useState<LedgerSummary[]>([]);
   const [score, setScore] = useState<ScoreView | null>(null);
@@ -40,7 +64,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
       setPersonal(ledgers.personal);
       setScore(scoreData);
     } catch {
-      // Sidebar nav is a convenience, not core functionality — fail quiet.
+      // Sidebar/profile nav is a convenience, not core functionality — fail quiet.
     }
   }, [authFetch]);
 
@@ -50,6 +74,12 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  return { groups, personal, score };
+}
+
+function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
+  const { groups, personal } = useLedgerNav();
 
   return (
     <div className="flex h-full flex-col">
@@ -61,15 +91,13 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
         </span>
       </Link>
 
-      <nav className="mt-6 flex-1 space-y-5 overflow-y-auto">
-        <Link
-          href="/"
-          onClick={onNavigate}
-          className="block rounded-lg px-3 py-1.5 text-sm font-medium text-ink hover:bg-surface-strong"
-        >
-          Dashboard
-        </Link>
+      <nav className="mt-6 flex flex-col gap-1 border-b border-surface-border pb-5 lg:hidden">
+        {NAV_ITEMS.map((item) => (
+          <NavLink key={item.href} {...item} onNavigate={onNavigate} />
+        ))}
+      </nav>
 
+      <nav className="mt-5 flex-1 space-y-5 overflow-y-auto">
         <div className="space-y-1.5">
           <p className="px-3 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-soft">
             Groups
@@ -92,24 +120,68 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
           )}
         </div>
       </nav>
-
-      <div className="space-y-2 border-t border-surface-border pt-3">
-        <p className="truncate px-1 text-sm font-medium text-ink">{user?.name}</p>
-        {score && (
-          <p className="px-1 font-mono text-xs text-ink-soft">Rank {score.currentRank}</p>
-        )}
-        <button
-          onClick={() => void logout()}
-          className="px-1 text-xs text-ink-soft underline underline-offset-2 hover:text-ink"
-        >
-          Sign out
-        </button>
-      </div>
     </div>
   );
 }
 
-export function AppShell({ title, children }: { title: string; children: ReactNode }) {
+function initials(name: string | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+function ProfileMenu() {
+  const { user, logout } = useAuth();
+  const { score } = useLedgerNav();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Account menu"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent font-mono text-xs font-semibold text-on-accent transition-transform active:scale-95"
+      >
+        {initials(user?.name)}
+      </button>
+
+      {open && (
+        <div className="animate-fade-in-up absolute right-0 top-11 z-50 w-56 rounded-xl border border-surface-border bg-bg-elevated p-3 shadow-[var(--glass-shadow)]">
+          <p className="truncate px-1 text-sm font-medium text-ink">{user?.name}</p>
+          <p className="truncate px-1 text-xs text-ink-soft">{user?.email}</p>
+          {score && (
+            <p className="mt-1 px-1 font-mono text-xs text-accent-strong">
+              Rank {score.currentRank} · {score.confirmedSettlements} settled
+            </p>
+          )}
+          <div className="mt-3 border-t border-surface-border pt-2">
+            <button
+              onClick={() => void logout()}
+              className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
@@ -149,9 +221,21 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
               />
             </svg>
           </button>
-          <h1 className="truncate font-display text-base font-semibold text-ink sm:text-lg">
-            {title}
-          </h1>
+
+          <Link href="/" className="flex items-center gap-2 lg:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
+            <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-6 w-6 rounded-md" />
+          </Link>
+
+          <nav className="hidden gap-1 lg:flex">
+            {NAV_ITEMS.map((item) => (
+              <NavLink key={item.href} {...item} onNavigate={() => {}} />
+            ))}
+          </nav>
+
+          <div className="ml-auto">
+            <ProfileMenu />
+          </div>
         </header>
 
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</main>

@@ -162,3 +162,12 @@ export const editChecklistItemSchema = z.object({
   dueDate: z.string().datetime().nullable().optional(),
 });
 export type EditChecklistItemInput = z.infer<typeof editChecklistItemSchema>;
+
+/**
+ * Feedback: the About & Contact page's feedback form.
+ */
+
+export const createFeedbackSchema = z.object({
+  message: z.string().trim().min(1).max(2000),
+});
+export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;

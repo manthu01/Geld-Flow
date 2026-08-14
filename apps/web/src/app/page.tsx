@@ -10,7 +10,7 @@ export default function Home() {
 
   if (status === "authenticated" && user) {
     return (
-      <AppShell title="Dashboard">
+      <AppShell>
         <Dashboard />
       </AppShell>
     );

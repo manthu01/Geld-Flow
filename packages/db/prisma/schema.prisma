@@ -93,6 +93,7 @@ model User {
   checklistCreated  ChecklistItem[]    @relation("ChecklistCreatedBy")
   chatLinks         ChatLink[]
   telegramLinkCodes TelegramLinkCode[]
+  feedback          Feedback[]
 
   @@map("users")
 }
@@ -389,4 +390,18 @@ model TelegramLinkCode {
 
   @@index([ledgerId])
   @@map("telegram_link_codes")
+}
+
+// One-way: the About & Contact page's feedback form writes here. No
+// in-app read path is built (yet) — this is a mailbox, not a feature.
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@map("feedback")
 }

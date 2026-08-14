@@ -22,7 +22,7 @@ export default function LedgerPage() {
   }
 
   return (
-    <AppShell title="Ledger">
+    <AppShell>
       <LedgerView ledgerId={params.id} />
     </AppShell>
   );

@@ -3,6 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
+import { Reveal } from "@/components/motion-primitives";
 import { API_URL, requestMagicLink } from "@/lib/api";
 
 function LoginError() {
@@ -37,7 +38,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
-      <div className="w-full max-w-sm space-y-6">
+      <Reveal className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <div className="flex justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
@@ -110,7 +111,7 @@ export default function LoginPage() {
             Continue with Google
           </a>
         </GlassCard>
-      </div>
+      </Reveal>
     </main>
   );
 }

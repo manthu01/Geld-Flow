@@ -17,6 +17,7 @@ import { ChecklistModule } from './checklist/checklist.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { BadgesModule } from './badges/badges.module';
 import { HealthModule } from './health/health.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -36,6 +37,7 @@ import { validateEnv } from './config/env.validation';
     TelegramModule,
     BadgesModule,
     HealthModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

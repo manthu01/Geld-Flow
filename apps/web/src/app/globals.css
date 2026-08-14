@@ -1,65 +1,37 @@
 @import "tailwindcss";
 
+/* Dark is the only theme now — no more light/dark split, no more
+   blue/gold. Background is a fixed black -> deep navy gradient; accent
+   is a cyan that pops against navy without colliding with the
+   owed/owes green-red semantics. */
 :root {
-  --bg: #f3f4f7;
-  --bg-elevated: #ffffff;
-  --surface: rgba(15, 23, 42, 0.045);
-  --surface-strong: rgba(15, 23, 42, 0.08);
-  --surface-border: rgba(15, 23, 42, 0.1);
-  --surface-highlight: rgba(255, 255, 255, 0.7);
-  --ink: #12151b;
-  --ink-soft: #5b6472;
-  --accent: #2f6fed;
-  --accent-strong: #1d4fc4;
-  --accent-tint: rgba(47, 111, 237, 0.12);
-  --accent-2: #7c5cff;
-  --accent-2-strong: #6842e0;
-  --accent-2-tint: rgba(124, 92, 255, 0.14);
-  /* Text color to use ON TOP of an --accent-colored surface — white reads
-     fine on the light mode blue, but dark mode's light-gold accent needs
-     dark text instead, so this flips per theme rather than being a fixed
-     white everywhere. */
-  --on-accent: #ffffff;
-  --owed: #17915f;
-  --owes: #d33a3a;
-  --ring: rgba(47, 111, 237, 0.45);
+  --bg: #05070c;
+  --bg-elevated: #10141f;
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface-strong: rgba(255, 255, 255, 0.1);
+  --surface-border: rgba(255, 255, 255, 0.12);
+  --surface-highlight: rgba(255, 255, 255, 0.16);
+  --ink: #eceef3;
+  --ink-soft: #98a2b5;
+  --accent: #22d3ee;
+  --accent-strong: #67e8f9;
+  --accent-tint: rgba(34, 211, 238, 0.16);
+  --accent-2: #a78bfa;
+  --accent-2-strong: #c4b3ff;
+  --accent-2-tint: rgba(167, 139, 250, 0.16);
+  /* Text color to use ON TOP of an --accent-colored surface. The cyan
+     accent is light, so it needs dark text rather than white. */
+  --on-accent: #04141a;
+  --owed: #3ddb9b;
+  --owes: #ff6b6b;
+  --ring: rgba(34, 211, 238, 0.5);
   --glass-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.05),
-    0 20px 48px -24px rgba(15, 23, 42, 0.3);
-  --aurora-1: #8ec5ff;
-  --aurora-2: #a78bfa;
-  --aurora-3: #5fd8bd;
-  --badge-gold: #c99a1e;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #05070b;
-    --bg-elevated: #12161f;
-    --surface: rgba(255, 255, 255, 0.055);
-    --surface-strong: rgba(255, 255, 255, 0.1);
-    --surface-border: rgba(255, 255, 255, 0.12);
-    --surface-highlight: rgba(255, 255, 255, 0.16);
-    --ink: #eceef3;
-    --ink-soft: #98a2b5;
-    --accent: #f4c430;
-    --accent-strong: #ffdb58;
-    --accent-tint: rgba(244, 196, 48, 0.18);
-    --accent-2: #a78bfa;
-    --accent-2-strong: #c4b3ff;
-    --accent-2-tint: rgba(167, 139, 250, 0.18);
-    --on-accent: #14110a;
-    --owed: #3ddb9b;
-    --owes: #ff6b6b;
-    --ring: rgba(244, 196, 48, 0.55);
-    --glass-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.3),
-      0 24px 60px -20px rgba(0, 0, 0, 0.65);
-    --aurora-1: #e8b923;
-    --aurora-2: #7c5cff;
-    --aurora-3: #16b88a;
-    --badge-gold: #ffd93d;
-  }
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 24px 60px -20px rgba(0, 0, 0, 0.65);
+  --aurora-1: #1fb6d8;
+  --aurora-2: #6d5bdb;
+  --aurora-3: #16b88a;
+  --badge-gold: #ffd93d;
 }
 
 @theme inline {
@@ -88,8 +60,19 @@
   --font-mono: var(--font-jetbrains);
 }
 
+html {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(
+      ellipse 120% 80% at 50% -10%,
+      #101c3d 0%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, #05070c 0%, #070a14 40%, #0a0f22 75%, #0d1330 100%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
@@ -119,7 +102,7 @@ body {
 .aurora__blob {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(80px);
+  filter: blur(90px);
   will-change: transform;
 }
 
@@ -129,7 +112,7 @@ body {
   width: 55vw;
   height: 55vw;
   background: var(--aurora-1);
-  opacity: 0.32;
+  opacity: 0.18;
   animation: aurora-drift-1 26s ease-in-out infinite;
 }
 
@@ -139,7 +122,7 @@ body {
   width: 60vw;
   height: 60vw;
   background: var(--aurora-2);
-  opacity: 0.28;
+  opacity: 0.16;
   animation: aurora-drift-2 32s ease-in-out infinite;
 }
 
@@ -149,7 +132,7 @@ body {
   width: 38vw;
   height: 38vw;
   background: var(--aurora-3);
-  opacity: 0.22;
+  opacity: 0.14;
   animation: aurora-drift-3 22s ease-in-out infinite;
 }
 

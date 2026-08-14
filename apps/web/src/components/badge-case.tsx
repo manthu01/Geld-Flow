@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GlassCard } from "@/components/glass-card";
 import { PixelBadge } from "@/components/pixel-badge";
+import { StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import { getMyBadges, type BadgeView } from "@/lib/api";
 
@@ -49,9 +50,9 @@ export function BadgeCase() {
           {earnedCount} / {badges.length}
         </span>
       </div>
-      <div className="flex flex-wrap gap-3">
+      <StaggerGroup className="flex flex-wrap gap-3">
         {badges.map((badge) => (
-          <div key={badge.id} className="flex w-16 flex-col items-center gap-1 text-center">
+          <StaggerItem key={badge.id} className="flex w-16 flex-col items-center gap-1 text-center">
             <PixelBadge
               iconRef={badge.iconRef}
               earned={badge.earned}
@@ -63,9 +64,9 @@ export function BadgeCase() {
             >
               {badge.name}
             </span>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerGroup>
     </GlassCard>
   );
 }

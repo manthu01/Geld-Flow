@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { GlassCard } from "@/components/glass-card";
 import { BadgeCase } from "@/components/badge-case";
 import { EmptyState } from "@/components/empty-state";
+import { GlassCard } from "@/components/glass-card";
+import { LedgerCard } from "@/components/ledger-card";
+import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import {
   createGroupLedger,
@@ -16,51 +18,10 @@ import {
   type ScoreView,
 } from "@/lib/api";
 
-const GROUP_TYPE_LABELS: Record<string, string> = {
-  group_general: "General",
-  group_travel: "Travel",
-  group_event: "Event",
-};
-
 function extractInviteToken(input: string): string {
   const trimmed = input.trim();
   const match = trimmed.match(/\/invites\/([^/]+)\/redeem/);
   return match ? match[1] : trimmed;
-}
-
-function LedgerCard({
-  ledger,
-  subtitle,
-  delayMs = 0,
-}: {
-  ledger: LedgerSummary;
-  subtitle: string;
-  delayMs?: number;
-}) {
-  const router = useRouter();
-  return (
-    <GlassCard
-      className="animate-fade-in-up cursor-pointer p-4 active:scale-[0.98]"
-      style={{ animationDelay: `${delayMs}ms` }}
-      interactive
-      glow
-      onClick={() => router.push(`/ledgers/${ledger.id}`)}
-    >
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-ink">
-          {ledger.name ?? subtitle}
-        </span>
-        <span className="font-mono text-xs text-ink-soft">
-          {ledger.type === "personal"
-            ? "Personal"
-            : GROUP_TYPE_LABELS[ledger.type]}
-        </span>
-      </div>
-      <p className="mt-1 text-xs text-ink-soft">
-        {ledger.type === "personal" ? subtitle : `${ledger._count?.members ?? ledger.members.length} members`}
-      </p>
-    </GlassCard>
-  );
 }
 
 export function Dashboard() {
@@ -155,8 +116,8 @@ export function Dashboard() {
   }
 
   return (
-    <div className="animate-fade-in-up w-full max-w-6xl space-y-8">
-      <div className="space-y-1">
+    <div className="w-full max-w-6xl space-y-8">
+      <Reveal className="space-y-1">
         <h1 className="font-display text-2xl font-semibold tracking-tight">
           Welcome back, {user?.name?.split(" ")[0]}
         </h1>
@@ -166,9 +127,11 @@ export function Dashboard() {
             {score.confirmedSettlements === 1 ? "" : "s"} confirmed
           </p>
         )}
-      </div>
+      </Reveal>
 
-      <BadgeCase />
+      <Reveal delay={0.05}>
+        <BadgeCase />
+      </Reveal>
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -289,11 +252,13 @@ export function Dashboard() {
             {groups.length === 0 ? (
               <EmptyState title="No group ledgers yet" hint="Start a trip, event, or tab above." />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {groups.map((g, i) => (
-                  <LedgerCard key={g.id} ledger={g} subtitle="Group" delayMs={i * 40} />
+              <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {groups.map((g) => (
+                  <StaggerItem key={g.id}>
+                    <LedgerCard ledger={g} subtitle="Group" />
+                  </StaggerItem>
                 ))}
-              </div>
+              </StaggerGroup>
             )}
           </section>
 
@@ -302,19 +267,16 @@ export function Dashboard() {
             {personal.length === 0 ? (
               <EmptyState title="No personal ledgers yet" hint="Open one with a friend's email above." />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {personal.map((p, i) => {
+              <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {personal.map((p) => {
                   const peer = p.members.find((m) => m.userId !== user?.id);
                   return (
-                    <LedgerCard
-                      key={p.id}
-                      ledger={p}
-                      subtitle={peer?.user.name ?? "Personal ledger"}
-                      delayMs={i * 40}
-                    />
+                    <StaggerItem key={p.id}>
+                      <LedgerCard ledger={p} subtitle={peer?.user.name ?? "Personal ledger"} />
+                    </StaggerItem>
                   );
                 })}
-              </div>
+              </StaggerGroup>
             )}
           </section>
         </>

@@ -428,3 +428,12 @@ export async function getUserBadges(
 ): Promise<BadgeView[]> {
   return parseJson(await authFetch(`/badges/${userId}`));
 }
+
+// ------------------------------------------------------------------ Feedback
+
+export async function submitFeedback(
+  authFetch: AuthFetch,
+  message: string,
+): Promise<{ id: string }> {
+  return parseJson(await postJson(authFetch, "/feedback", { message }));
+}
