@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import {
   BadRequestException,
   Injectable,
@@ -17,11 +17,28 @@ function hashToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
 }
 
+// Shadow (unclaimed) member support: an admin can add someone to a
+// personal ledger who has no Geld Flow account yet. That creates a real
+// User row (isShadow: true) with a synthetic email so every expense,
+// share, and settlement can reference it exactly like a real member.
+// The claim link lets that person later attach their own account — see
+// redeemClaim for how ownership of those rows transfers.
+const SHADOW_EMAIL_DOMAIN = 'members.geldflow.internal';
+const CLAIM_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+
 const MEMBER_SELECT = {
   userId: true,
   role: true,
   joinedAt: true,
-  user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      avatarUrl: true,
+      isShadow: true,
+    },
+  },
 } as const;
 
 @Injectable()
@@ -164,22 +181,57 @@ export class LedgersService {
   async getOrCreatePersonalLedger(
     userId: string,
     input: GetOrCreatePersonalLedgerInput,
-  ): Promise<Ledger> {
-    const peer = await prisma.user.findUnique({
-      where: { email: input.peerEmail },
-    });
-    if (!peer) {
-      throw new NotFoundException(
-        'No Geld Flow account found for that email yet — ask them to sign up first.',
+    webBaseUrl: string,
+  ): Promise<{ ledger: Ledger; claimUrl?: string }> {
+    if (input.peerEmail) {
+      const peer = await prisma.user.findUnique({
+        where: { email: input.peerEmail },
+      });
+      if (!peer) {
+        throw new NotFoundException(
+          'No Geld Flow account found for that email yet — add them by name instead, or ask them to sign up first.',
+        );
+      }
+      if (peer.id === userId) {
+        throw new BadRequestException(
+          'You cannot open a personal ledger with yourself.',
+        );
+      }
+      const ledger = await this.openPersonalLedger(
+        userId,
+        peer.id,
+        input.baseCurrency,
       );
-    }
-    if (peer.id === userId) {
-      throw new BadRequestException(
-        'You cannot open a personal ledger with yourself.',
-      );
+      return { ledger };
     }
 
-    const [a, b] = [userId, peer.id].sort();
+    // peerName path: this person has no account (or the admin doesn't
+    // know their email) — create a shadow member plus a claim link.
+    const rawToken = randomBytes(24).toString('hex');
+    const shadow = await prisma.user.create({
+      data: {
+        email: `shadow-${randomUUID()}@${SHADOW_EMAIL_DOMAIN}`,
+        name: input.peerName!.trim(),
+        isShadow: true,
+        addedByUserId: userId,
+        claimTokenHash: hashToken(rawToken),
+        claimExpiresAt: new Date(Date.now() + CLAIM_TOKEN_TTL_MS),
+      },
+    });
+    const ledger = await this.openPersonalLedger(
+      userId,
+      shadow.id,
+      input.baseCurrency,
+    );
+    return { ledger, claimUrl: `${webBaseUrl}/claim/${rawToken}` };
+  }
+
+  private async openPersonalLedger(
+    userId: string,
+    peerId: string,
+    baseCurrency: string,
+  ): Promise<Ledger> {
+    const [a, b] = [userId, peerId].sort();
 
     const existing = await prisma.ledger.findFirst({
       where: { type: 'personal', personalUserAId: a, personalUserBId: b },
@@ -192,14 +244,14 @@ export class LedgersService {
       const ledger = await tx.ledger.create({
         data: {
           type: 'personal',
-          baseCurrency: input.baseCurrency.toUpperCase(),
+          baseCurrency: baseCurrency.toUpperCase(),
           createdById: userId,
           personalUserAId: a,
           personalUserBId: b,
           members: {
             create: [
               { userId, role: 'owner' },
-              { userId: peer.id, role: 'member' },
+              { userId: peerId, role: 'member' },
             ],
           },
         },
@@ -214,5 +266,141 @@ export class LedgersService {
 
       return ledger;
     });
+  }
+
+  // ------------------------------------------------------- Claim a shadow
+
+  async getClaimInfo(rawToken: string) {
+    const shadow = await this.findValidShadow(rawToken);
+    const ledger = await prisma.ledger.findFirst({
+      where: {
+        type: 'personal',
+        OR: [{ personalUserAId: shadow.id }, { personalUserBId: shadow.id }],
+      },
+      include: { createdBy: { select: { name: true } } },
+    });
+
+    return {
+      shadowName: shadow.name,
+      addedByName: ledger?.createdBy.name ?? null,
+      ledgerName: ledger?.name ?? null,
+    };
+  }
+
+  async redeemClaim(rawToken: string, claimerId: string) {
+    const shadow = await this.findValidShadow(rawToken);
+    if (shadow.id === claimerId) {
+      throw new BadRequestException('You cannot claim your own contact.');
+    }
+
+    const ledger = await prisma.ledger.findFirst({
+      where: {
+        type: 'personal',
+        OR: [{ personalUserAId: shadow.id }, { personalUserBId: shadow.id }],
+      },
+    });
+    if (!ledger) {
+      throw new NotFoundException(
+        'The ledger for this contact no longer exists.',
+      );
+    }
+
+    const alreadyMember = await this.access.getMembership(ledger.id, claimerId);
+    if (alreadyMember) {
+      throw new BadRequestException(
+        'You are already part of this personal ledger.',
+      );
+    }
+
+    const otherUserId =
+      ledger.personalUserAId === shadow.id
+        ? ledger.personalUserBId!
+        : ledger.personalUserAId!;
+    const [a, b] = [claimerId, otherUserId].sort();
+
+    await prisma.$transaction([
+      prisma.ledgerMember.update({
+        where: { ledgerId_userId: { ledgerId: ledger.id, userId: shadow.id } },
+        data: { userId: claimerId },
+      }),
+      prisma.ledger.update({
+        where: { id: ledger.id },
+        data: { personalUserAId: a, personalUserBId: b },
+      }),
+      prisma.expense.updateMany({
+        where: { paidByUserId: shadow.id },
+        data: { paidByUserId: claimerId },
+      }),
+      prisma.expense.updateMany({
+        where: { createdById: shadow.id },
+        data: { createdById: claimerId },
+      }),
+      prisma.expenseShare.updateMany({
+        where: { userId: shadow.id },
+        data: { userId: claimerId },
+      }),
+      prisma.settlement.updateMany({
+        where: { fromUserId: shadow.id },
+        data: { fromUserId: claimerId },
+      }),
+      prisma.settlement.updateMany({
+        where: { toUserId: shadow.id },
+        data: { toUserId: claimerId },
+      }),
+      prisma.activityEvent.updateMany({
+        where: { actorId: shadow.id },
+        data: { actorId: claimerId },
+      }),
+      prisma.activityEvent.create({
+        data: {
+          ledgerId: ledger.id,
+          actorId: claimerId,
+          type: 'member_joined',
+          payload: { claimed: true },
+        },
+      }),
+      prisma.user.delete({ where: { id: shadow.id } }),
+    ]);
+
+    return { ledgerId: ledger.id };
+  }
+
+  private async findValidShadow(rawToken: string) {
+    const shadow = await prisma.user.findUnique({
+      where: { claimTokenHash: hashToken(rawToken) },
+    });
+    if (
+      !shadow ||
+      !shadow.isShadow ||
+      !shadow.claimExpiresAt ||
+      shadow.claimExpiresAt < new Date()
+    ) {
+      throw new NotFoundException('This claim link is invalid or has expired.');
+    }
+    return shadow;
+  }
+
+  // ------------------------------------------------------------ Deletion
+
+  /**
+   * A ledger can only be deleted once it's still empty — zero expenses
+   * and zero settlements recorded. That keeps deletion from ever being
+   * used to erase real financial history; once money has moved, the
+   * ledger is permanent.
+   */
+  async deleteLedger(ledgerId: string, userId: string): Promise<void> {
+    await this.access.assertMember(ledgerId, userId);
+
+    const [expenseCount, settlementCount] = await Promise.all([
+      prisma.expense.count({ where: { ledgerId, deletedAt: null } }),
+      prisma.settlement.count({ where: { ledgerId } }),
+    ]);
+    if (expenseCount > 0 || settlementCount > 0) {
+      throw new BadRequestException(
+        'This ledger already has activity recorded, so it can no longer be deleted.',
+      );
+    }
+
+    await prisma.ledger.delete({ where: { id: ledgerId } });
   }
 }

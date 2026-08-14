@@ -6,17 +6,18 @@ import { BadgeCase } from "@/components/badge-case";
 import { EmptyState } from "@/components/empty-state";
 import { GlassCard } from "@/components/glass-card";
 import { LedgerCard } from "@/components/ledger-card";
+import { PersonalLedgerForm } from "@/components/personal-ledger-form";
 import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import {
   createGroupLedger,
   getMyScore,
-  getOrCreatePersonalLedger,
   listMyLedgers,
   redeemInvite,
   type LedgerSummary,
   type ScoreView,
 } from "@/lib/api";
+import { PENDING_CLAIM_KEY } from "@/lib/claim";
 
 function extractInviteToken(input: string): string {
   const trimmed = input.trim();
@@ -65,6 +66,18 @@ export function Dashboard() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    // A claim link visited while signed out sends the person to /login
+    // with no way to return to it afterwards, so it stashes the token
+    // here first — the dashboard is where every sign-in flow lands, so
+    // this is where we pick it back up and finish the trip.
+    const pending = window.localStorage.getItem(PENDING_CLAIM_KEY);
+    if (pending) {
+      window.localStorage.removeItem(PENDING_CLAIM_KEY);
+      router.replace(`/claim/${pending}`);
+    }
+  }, [router]);
+
   async function handleCreateGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -79,23 +92,6 @@ export function Dashboard() {
       router.push(`/ledgers/${ledger.id}`);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Could not create the group.");
-      setBusy(false);
-    }
-  }
-
-  async function handlePersonal(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBusy(true);
-    setFormError(null);
-    try {
-      const ledger = await getOrCreatePersonalLedger(authFetch, {
-        peerEmail: String(form.get("peerEmail") || ""),
-        baseCurrency: String(form.get("currency") || "USD"),
-      });
-      router.push(`/ledgers/${ledger.id}`);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Could not open that personal ledger.");
       setBusy(false);
     }
   }
@@ -198,28 +194,7 @@ export function Dashboard() {
         </GlassCard>
       )}
 
-      {showPersonal && (
-        <GlassCard className="space-y-3 p-5">
-          <form onSubmit={handlePersonal} className="space-y-3">
-            <input
-              name="peerEmail"
-              type="email"
-              required
-              placeholder="Their email address"
-              className="w-full rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <input type="hidden" name="currency" value="USD" />
-            {formError && <p className="text-sm text-owes">{formError}</p>}
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
-            >
-              {busy ? "Opening…" : "Open personal ledger"}
-            </button>
-          </form>
-        </GlassCard>
-      )}
+      {showPersonal && <PersonalLedgerForm />}
 
       {showJoin && (
         <GlassCard className="space-y-3 p-5">
@@ -272,7 +247,11 @@ export function Dashboard() {
                   const peer = p.members.find((m) => m.userId !== user?.id);
                   return (
                     <StaggerItem key={p.id}>
-                      <LedgerCard ledger={p} subtitle={peer?.user.name ?? "Personal ledger"} />
+                      <LedgerCard
+                        ledger={p}
+                        subtitle={peer?.user.name ?? "Personal ledger"}
+                        pending={peer?.user.isShadow}
+                      />
                     </StaggerItem>
                   );
                 })}

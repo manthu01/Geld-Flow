@@ -78,7 +78,13 @@ export interface LedgerMemberView {
   userId: string;
   role: "owner" | "admin" | "member";
   joinedAt: string;
-  user: { id: string; name: string; email: string; avatarUrl: string | null };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    isShadow: boolean;
+  };
 }
 
 export interface LedgerSummary {
@@ -111,8 +117,8 @@ export async function createGroupLedger(
 
 export async function getOrCreatePersonalLedger(
   authFetch: AuthFetch,
-  input: { peerEmail: string; baseCurrency: string },
-): Promise<LedgerSummary> {
+  input: { peerEmail?: string; peerName?: string; baseCurrency: string },
+): Promise<{ ledger: LedgerSummary; claimUrl?: string }> {
   return parseJson(await postJson(authFetch, "/ledgers/personal", input));
 }
 
@@ -121,6 +127,37 @@ export async function getLedgerDetail(
   ledgerId: string,
 ): Promise<LedgerDetail> {
   return parseJson(await authFetch(`/ledgers/${ledgerId}`));
+}
+
+export async function deleteLedger(
+  authFetch: AuthFetch,
+  ledgerId: string,
+): Promise<void> {
+  const res = await authFetch(`/ledgers/${ledgerId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const data: unknown = await res.json();
+    throw new Error(readErrorMessage(data));
+  }
+}
+
+// ------------------------------------------------------------------ Claims
+
+export interface ClaimInfo {
+  shadowName: string;
+  addedByName: string | null;
+  ledgerName: string | null;
+}
+
+export async function getClaimInfo(token: string): Promise<ClaimInfo> {
+  const res = await fetch(`${API_URL}/claims/${token}`);
+  return parseJson(res);
+}
+
+export async function redeemClaim(
+  authFetch: AuthFetch,
+  token: string,
+): Promise<{ ledgerId: string }> {
+  return parseJson(await postJson(authFetch, `/claims/${token}/redeem`));
 }
 
 export async function createInvite(

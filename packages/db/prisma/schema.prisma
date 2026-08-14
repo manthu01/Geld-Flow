@@ -75,7 +75,21 @@ model User {
   avatarUrl String?  @map("avatar_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  // Shadow (unclaimed) member: created when an admin adds someone to a
+  // personal ledger by name only, with no account yet. Uses a synthetic,
+  // unguessable placeholder email (never a real login target) so the
+  // unique email constraint still holds. Every money row (expenses,
+  // shares, settlements, activity) is written against this row's id like
+  // any other user, so once the real person redeems the claim link and
+  // those rows are re-pointed at their real account, their history is
+  // already complete — nothing needs backfilling.
+  isShadow        Boolean   @default(false) @map("is_shadow")
+  claimTokenHash  String?   @unique @map("claim_token_hash")
+  claimExpiresAt  DateTime? @map("claim_expires_at")
+  addedByUserId   String?   @map("added_by_user_id")
 
+  addedBy           User?              @relation("ShadowAddedBy", fields: [addedByUserId], references: [id])
+  shadowContacts    User[]             @relation("ShadowAddedBy")
   authIdentities    AuthIdentity[]
   refreshTokens     RefreshToken[]
   ledgerMembers     LedgerMember[]

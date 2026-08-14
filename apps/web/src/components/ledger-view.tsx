@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
 import { ExpenseForm } from "@/components/expense-form";
 import { ChecklistPanel } from "@/components/checklist-panel";
@@ -16,6 +17,7 @@ import {
   createInvite,
   declineSettlement,
   deleteExpense,
+  deleteLedger,
   getBalances,
   getDebtSimplification,
   getLedgerDetail,
@@ -39,6 +41,7 @@ function rankLabel(score: ScoreView | undefined): string {
 
 export function LedgerView({ ledgerId }: { ledgerId: string }) {
   const { user, authFetch } = useAuth();
+  const router = useRouter();
 
   const [ledger, setLedger] = useState<LedgerDetail | null>(null);
   const [balances, setBalances] = useState<MemberBalance[]>([]);
@@ -162,6 +165,17 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
     }
   }
 
+  async function handleDeleteLedger() {
+    if (!window.confirm("Delete this ledger? This can't be undone.")) return;
+    setActionError(null);
+    try {
+      await deleteLedger(authFetch, ledgerId);
+      router.push("/");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not delete this ledger.");
+    }
+  }
+
   if (loading) {
     return <p className="text-sm text-ink-soft">Loading ledger…</p>;
   }
@@ -181,13 +195,23 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
         <Link href="/" className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink">
           ← All ledgers
         </Link>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
             {ledger.name ?? LEDGER_TYPE_LABELS[ledger.type]}
           </h1>
-          <span className="font-mono text-xs text-ink-soft">
-            {LEDGER_TYPE_LABELS[ledger.type]}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-ink-soft">
+              {LEDGER_TYPE_LABELS[ledger.type]}
+            </span>
+            {expenses.length === 0 && settlements.length === 0 && (
+              <button
+                onClick={handleDeleteLedger}
+                className="text-xs text-owes underline underline-offset-2 hover:text-owes/80"
+              >
+                Delete ledger
+              </button>
+            )}
+          </div>
         </div>
       </Reveal>
 

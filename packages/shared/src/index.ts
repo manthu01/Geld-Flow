@@ -123,10 +123,18 @@ export const createInviteSchema = z.object({
 });
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
 
-export const getOrCreatePersonalLedgerSchema = z.object({
-  peerEmail: z.string().trim().toLowerCase().email(),
-  baseCurrency: z.string().length(3).default("USD"),
-});
+export const getOrCreatePersonalLedgerSchema = z
+  .object({
+    // Exactly one of these: peerEmail connects an existing account
+    // directly; peerName creates a name-only "shadow" contact the admin
+    // can add regardless of whether that person has signed up yet.
+    peerEmail: z.string().trim().toLowerCase().email().optional(),
+    peerName: z.string().trim().min(1).max(80).optional(),
+    baseCurrency: z.string().length(3).default("USD"),
+  })
+  .refine((val) => Boolean(val.peerEmail) !== Boolean(val.peerName), {
+    message: "Provide either peerEmail or peerName, not both.",
+  });
 export type GetOrCreatePersonalLedgerInput = z.infer<
   typeof getOrCreatePersonalLedgerSchema
 >;

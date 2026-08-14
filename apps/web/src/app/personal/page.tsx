@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
-import { GlassCard } from "@/components/glass-card";
 import { LedgerCard } from "@/components/ledger-card";
+import { PersonalLedgerForm } from "@/components/personal-ledger-form";
 import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
-import { getOrCreatePersonalLedger, listMyLedgers, type LedgerSummary } from "@/lib/api";
+import { listMyLedgers, type LedgerSummary } from "@/lib/api";
 
 export default function PersonalPage() {
   const { status, user, authFetch } = useAuth();
@@ -17,8 +17,6 @@ export default function PersonalPage() {
   const [personal, setPersonal] = useState<LedgerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,23 +39,6 @@ export default function PersonalPage() {
     }
   }, [status, router, load]);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBusy(true);
-    setFormError(null);
-    try {
-      const ledger = await getOrCreatePersonalLedger(authFetch, {
-        peerEmail: String(form.get("peerEmail") || ""),
-        baseCurrency: String(form.get("currency") || "USD"),
-      });
-      router.push(`/ledgers/${ledger.id}`);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Could not open that personal ledger.");
-      setBusy(false);
-    }
-  }
-
   if (status !== "authenticated") return null;
 
   return (
@@ -76,28 +57,7 @@ export default function PersonalPage() {
           </button>
         </Reveal>
 
-        {showNew && (
-          <GlassCard className="space-y-3 p-5">
-            <form onSubmit={handleCreate} className="space-y-3">
-              <input
-                name="peerEmail"
-                type="email"
-                required
-                placeholder="Their email address"
-                className="w-full rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-              <input type="hidden" name="currency" value="USD" />
-              {formError && <p className="text-sm text-owes">{formError}</p>}
-              <button
-                type="submit"
-                disabled={busy}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-strong active:scale-95 disabled:opacity-60"
-              >
-                {busy ? "Opening…" : "Open personal ledger"}
-              </button>
-            </form>
-          </GlassCard>
-        )}
+        {showNew && <PersonalLedgerForm />}
 
         {loading ? (
           <p className="text-sm text-ink-soft">Loading…</p>
@@ -109,7 +69,11 @@ export default function PersonalPage() {
               const peer = p.members.find((m) => m.userId !== user?.id);
               return (
                 <StaggerItem key={p.id}>
-                  <LedgerCard ledger={p} subtitle={peer?.user.name ?? "Personal ledger"} />
+                  <LedgerCard
+                    ledger={p}
+                    subtitle={peer?.user.name ?? "Personal ledger"}
+                    pending={peer?.user.isShadow}
+                  />
                 </StaggerItem>
               );
             })}

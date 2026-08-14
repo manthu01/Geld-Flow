@@ -13,9 +13,11 @@ export const GROUP_TYPE_LABELS: Record<string, string> = {
 export function LedgerCard({
   ledger,
   subtitle,
+  pending,
 }: {
   ledger: LedgerSummary;
   subtitle: string;
+  pending?: boolean;
 }) {
   const router = useRouter();
   return (
@@ -25,8 +27,8 @@ export function LedgerCard({
       glow
       onClick={() => router.push(`/ledgers/${ledger.id}`)}
     >
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-ink">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-medium text-ink">
           {ledger.name ?? subtitle}
         </span>
         <span className="font-mono text-xs text-ink-soft">
@@ -35,9 +37,16 @@ export function LedgerCard({
             : GROUP_TYPE_LABELS[ledger.type]}
         </span>
       </div>
-      <p className="mt-1 text-xs text-ink-soft">
-        {ledger.type === "personal" ? subtitle : `${ledger._count?.members ?? ledger.members.length} members`}
-      </p>
+      <div className="mt-1 flex items-center gap-2">
+        <p className="text-xs text-ink-soft">
+          {ledger.type === "personal" ? subtitle : `${ledger._count?.members ?? ledger.members.length} members`}
+        </p>
+        {pending && (
+          <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-strong">
+            Pending
+          </span>
+        )}
+      </div>
     </GlassCard>
   );
 }

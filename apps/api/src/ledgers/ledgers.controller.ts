@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { User } from '@geld-flow/db';
 import {
@@ -29,6 +37,10 @@ export class LedgersController {
     );
   }
 
+  private get webBaseUrl(): string {
+    return this.config.get<string>('WEB_APP_URL') ?? 'http://localhost:3000';
+  }
+
   @Post()
   create(
     @CurrentUser() user: User,
@@ -43,7 +55,11 @@ export class LedgersController {
     @Body(new ZodValidationPipe(getOrCreatePersonalLedgerSchema))
     body: GetOrCreatePersonalLedgerInput,
   ) {
-    return this.ledgers.getOrCreatePersonalLedger(user.id, body);
+    return this.ledgers.getOrCreatePersonalLedger(
+      user.id,
+      body,
+      this.webBaseUrl,
+    );
   }
 
   @Get()
@@ -54,6 +70,11 @@ export class LedgersController {
   @Get(':id')
   getDetail(@CurrentUser() user: User, @Param('id') id: string) {
     return this.ledgers.getDetail(id, user.id);
+  }
+
+  @Delete(':id')
+  deleteLedger(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.ledgers.deleteLedger(id, user.id);
   }
 
   @Post(':id/invites')
