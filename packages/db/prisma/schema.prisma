@@ -71,6 +71,11 @@ enum ChatPlatform {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
+  // Separate from `name`: a stable, unique, self-chosen handle. Every
+  // account gets one generated at signup (from the email's local part)
+  // so the field is never empty, but the user can change it any time
+  // from the profile menu — unlike `name`, it must stay unique.
+  username  String   @unique
   name      String
   avatarUrl String?  @map("avatar_url")
   createdAt DateTime @default(now()) @map("created_at")

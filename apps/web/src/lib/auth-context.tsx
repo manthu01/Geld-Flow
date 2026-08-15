@@ -22,6 +22,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   /** Authenticated fetch to the API: attaches the access token and, on a 401, retries once after a session restore (the access token may have simply expired). */
   authFetch: (path: string, init?: RequestInit) => Promise<Response>;
+  /** Patches the cached user profile after a successful edit, without a full session restore. */
+  updateUser: (user: CurrentUser) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -102,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ status, user, accessToken, restoreSession, logout, authFetch }}
+      value={{ status, user, accessToken, restoreSession, logout, authFetch, updateUser: setUser }}
     >
       {children}
     </AuthContext.Provider>

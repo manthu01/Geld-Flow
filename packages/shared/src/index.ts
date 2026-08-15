@@ -9,6 +9,25 @@ export const requestMagicLinkSchema = z.object({
 });
 export type RequestMagicLinkInput = z.infer<typeof requestMagicLinkSchema>;
 
+// Username is a separate, unique handle from the display `name` — every
+// account gets one auto-generated at signup, editable any time after.
+export const USERNAME_PATTERN = /^[a-z][a-z0-9_]{2,19}$/;
+
+export const updateProfileSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(
+      USERNAME_PATTERN,
+      "3-20 characters, start with a letter, lowercase letters/numbers/underscores only",
+    )
+    .optional(),
+  avatarUrl: z.string().trim().url().max(500).nullable().optional(),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
 /**
  * Enums mirrored from packages/db/prisma/schema.prisma.
  * Kept here (not imported from @prisma/client) so apps/web never needs

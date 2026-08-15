@@ -1,8 +1,13 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { prisma, type User } from '@geld-flow/db';
+import type { UpdateProfileInput } from '@geld-flow/shared';
 
 export const REFRESH_COOKIE_NAME = 'refresh_token';
 export const REFRESH_COOKIE_PATH = '/auth';
@@ -25,6 +30,32 @@ export interface IssuedTokens {
 
 function hashToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
+}
+
+/**
+ * Derives a unique username from an email's local part on first signup.
+ * Only runs once per account (existing users keep whatever they've
+ * chosen) — collisions get a numeric suffix rather than failing signup.
+ */
+export async function generateUniqueUsername(
+  localPart: string,
+): Promise<string> {
+  const cleaned =
+    localPart
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 16) || 'user';
+  const root = /^[a-z]/.test(cleaned) ? cleaned : `u${cleaned}`;
+  const base = root.length >= 3 ? root : root.padEnd(3, '0');
+
+  let candidate = base;
+  let suffix = 0;
+  while (await prisma.user.findUnique({ where: { username: candidate } })) {
+    suffix += 1;
+    const suffixStr = String(suffix);
+    candidate = `${base.slice(0, 20 - suffixStr.length)}${suffixStr}`;
+  }
+  return candidate;
 }
 
 @Injectable()
@@ -73,10 +104,18 @@ export class AuthService {
       data: { usedAt: new Date() },
     });
 
-    return prisma.user.upsert({
+    const existing = await prisma.user.findUnique({
       where: { email: record.email },
-      update: {},
-      create: { email: record.email, name: record.email.split('@')[0] },
+    });
+    if (existing) return existing;
+
+    const localPart = record.email.split('@')[0] ?? 'user';
+    return prisma.user.create({
+      data: {
+        email: record.email,
+        name: localPart,
+        username: await generateUniqueUsername(localPart),
+      },
     });
   }
 
@@ -101,15 +140,21 @@ export class AuthService {
       return existingIdentity.user;
     }
 
-    const user = await prisma.user.upsert({
+    const existingUser = await prisma.user.findUnique({
       where: { email: input.email },
-      update: {},
-      create: {
-        email: input.email,
-        name: input.name,
-        avatarUrl: input.avatarUrl,
-      },
     });
+    const user =
+      existingUser ??
+      (await prisma.user.create({
+        data: {
+          email: input.email,
+          name: input.name,
+          avatarUrl: input.avatarUrl,
+          username: await generateUniqueUsername(
+            input.email.split('@')[0] ?? 'user',
+          ),
+        },
+      }));
 
     await prisma.authIdentity.create({
       data: {
@@ -196,6 +241,33 @@ export class AuthService {
     await prisma.refreshToken.updateMany({
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
+    });
+  }
+
+  // ------------------------------------------------------------- Profile
+
+  async updateProfile(
+    userId: string,
+    input: UpdateProfileInput,
+  ): Promise<User> {
+    if (input.username) {
+      const taken = await prisma.user.findUnique({
+        where: { username: input.username },
+      });
+      if (taken && taken.id !== userId) {
+        throw new ConflictException('That username is already taken.');
+      }
+    }
+
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.username !== undefined ? { username: input.username } : {}),
+        ...(input.avatarUrl !== undefined
+          ? { avatarUrl: input.avatarUrl }
+          : {}),
+      },
     });
   }
 }

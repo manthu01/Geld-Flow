@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { EditProfileModal } from "@/components/edit-profile-modal";
 import { useAuth } from "@/lib/auth-context";
 import { getMyScore, listMyLedgers, type LedgerSummary, type ScoreView } from "@/lib/api";
 
@@ -132,10 +133,31 @@ function initials(name: string | undefined): string {
   return (first + last).toUpperCase();
 }
 
+function Avatar({ name, avatarUrl, className }: { name: string | undefined; avatarUrl: string | null | undefined; className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (avatarUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- arbitrary user-supplied URL, next/image can't optimize it
+      <img
+        src={avatarUrl}
+        alt=""
+        className={`${className} object-cover`}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <div className={`${className} flex items-center justify-center bg-accent font-mono font-semibold text-on-accent`}>
+      {initials(name)}
+    </div>
+  );
+}
+
 function ProfileMenu() {
   const { user, logout } = useAuth();
   const { score } = useLedgerNav();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -153,21 +175,31 @@ function ProfileMenu() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Account menu"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent font-mono text-xs font-semibold text-on-accent transition-transform active:scale-95"
+        className="overflow-hidden rounded-full transition-transform active:scale-95"
       >
-        {initials(user?.name)}
+        <Avatar name={user?.name} avatarUrl={user?.avatarUrl} className="h-9 w-9 text-xs" />
       </button>
 
       {open && (
         <div className="animate-fade-in-up absolute right-0 top-11 z-50 w-56 rounded-xl border border-surface-border bg-bg-elevated p-3 shadow-[var(--glass-shadow)]">
           <p className="truncate px-1 text-sm font-medium text-ink">{user?.name}</p>
+          <p className="truncate px-1 font-mono text-xs text-accent-strong">@{user?.username}</p>
           <p className="truncate px-1 text-xs text-ink-soft">{user?.email}</p>
           {score && (
-            <p className="mt-1 px-1 font-mono text-xs text-accent-strong">
+            <p className="mt-1 px-1 font-mono text-xs text-ink-soft">
               Rank {score.currentRank} · {score.confirmedSettlements} settled
             </p>
           )}
-          <div className="mt-3 border-t border-surface-border pt-2">
+          <div className="mt-3 space-y-0.5 border-t border-surface-border pt-2">
+            <button
+              onClick={() => {
+                setEditing(true);
+                setOpen(false);
+              }}
+              className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
+            >
+              Edit profile
+            </button>
             <button
               onClick={() => void logout()}
               className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
@@ -177,6 +209,8 @@ function ProfileMenu() {
           </div>
         </div>
       )}
+
+      {editing && <EditProfileModal onClose={() => setEditing(false)} />}
     </div>
   );
 }

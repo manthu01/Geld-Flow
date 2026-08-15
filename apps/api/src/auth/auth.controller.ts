@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Query,
   Req,
@@ -14,7 +15,9 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
   requestMagicLinkSchema,
+  updateProfileSchema,
   type RequestMagicLinkInput,
+  type UpdateProfileInput,
 } from '@geld-flow/shared';
 import type { User } from '@geld-flow/db';
 import type { CookieOptions, Request, Response } from 'express';
@@ -149,6 +152,7 @@ export class AuthController {
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         name: user.name,
         avatarUrl: user.avatarUrl,
       },
@@ -172,8 +176,25 @@ export class AuthController {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       name: user.name,
       avatarUrl: user.avatarUrl,
+    };
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  async updateMe(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(updateProfileSchema)) body: UpdateProfileInput,
+  ) {
+    const updated = await this.authService.updateProfile(user.id, body);
+    return {
+      id: updated.id,
+      email: updated.email,
+      username: updated.username,
+      name: updated.name,
+      avatarUrl: updated.avatarUrl,
     };
   }
 }

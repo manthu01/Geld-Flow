@@ -3,6 +3,7 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000
 export interface CurrentUser {
   id: string;
   email: string;
+  username: string;
   name: string;
   avatarUrl: string | null;
 }
@@ -70,6 +71,19 @@ function postJson(authFetch: AuthFetch, path: string, body?: unknown) {
     method: "POST",
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
+}
+
+// ----------------------------------------------------------------- Profile
+
+export async function updateProfile(
+  authFetch: AuthFetch,
+  input: { name?: string; username?: string; avatarUrl?: string | null },
+): Promise<CurrentUser> {
+  const res = await authFetch("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return parseJson(res);
 }
 
 // ---------------------------------------------------------------- Ledgers

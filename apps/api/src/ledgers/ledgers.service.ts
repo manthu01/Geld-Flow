@@ -12,6 +12,7 @@ import type {
 } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
 import { BadgesService } from '../badges/badges.service';
+import { generateUniqueUsername } from '../auth/auth.service';
 
 function hashToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
@@ -208,10 +209,12 @@ export class LedgersService {
     // peerName path: this person has no account (or the admin doesn't
     // know their email) — create a shadow member plus a claim link.
     const rawToken = randomBytes(24).toString('hex');
+    const peerName = input.peerName!.trim();
     const shadow = await prisma.user.create({
       data: {
         email: `shadow-${randomUUID()}@${SHADOW_EMAIL_DOMAIN}`,
-        name: input.peerName!.trim(),
+        username: await generateUniqueUsername(peerName),
+        name: peerName,
         isShadow: true,
         addedByUserId: userId,
         claimTokenHash: hashToken(rawToken),
