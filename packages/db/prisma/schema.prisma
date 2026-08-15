@@ -76,6 +76,10 @@ model User {
   // so the field is never empty, but the user can change it any time
   // from the profile menu — unlike `name`, it must stay unique.
   username  String   @unique
+  // Set only when the user actually changes their username (not on
+  // signup) — lets updateProfile enforce a 14-day cooldown between
+  // changes without needing a separate history table.
+  usernameChangedAt DateTime? @map("username_changed_at")
   name      String
   avatarUrl String?  @map("avatar_url")
   createdAt DateTime @default(now()) @map("created_at")

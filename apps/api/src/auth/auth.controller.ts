@@ -32,6 +32,17 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleConfiguredGuard } from './guards/google-configured.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
+function toProfileView(user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    usernameChangedAt: user.usernameChangedAt,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+  };
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -149,13 +160,7 @@ export class AuthController {
 
     return {
       accessToken: tokens.accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-      },
+      user: toProfileView(user),
     };
   }
 
@@ -173,13 +178,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: User) {
-    return {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      name: user.name,
-      avatarUrl: user.avatarUrl,
-    };
+    return toProfileView(user);
   }
 
   @Patch('me')
@@ -189,12 +188,6 @@ export class AuthController {
     @Body(new ZodValidationPipe(updateProfileSchema)) body: UpdateProfileInput,
   ) {
     const updated = await this.authService.updateProfile(user.id, body);
-    return {
-      id: updated.id,
-      email: updated.email,
-      username: updated.username,
-      name: updated.name,
-      avatarUrl: updated.avatarUrl,
-    };
+    return toProfileView(updated);
   }
 }

@@ -4,6 +4,7 @@ export interface CurrentUser {
   id: string;
   email: string;
   username: string;
+  usernameChangedAt: string | null;
   name: string;
   avatarUrl: string | null;
 }

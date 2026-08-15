@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -14,6 +15,7 @@ export const REFRESH_COOKIE_PATH = '/auth';
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const USERNAME_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 export interface GoogleProfileInput {
   providerUserId: string;
@@ -250,7 +252,27 @@ export class AuthService {
     userId: string,
     input: UpdateProfileInput,
   ): Promise<User> {
-    if (input.username) {
+    const current = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+    const isChangingUsername =
+      input.username !== undefined && input.username !== current.username;
+
+    if (isChangingUsername) {
+      if (current.usernameChangedAt) {
+        const nextAllowedAt = new Date(
+          current.usernameChangedAt.getTime() + USERNAME_COOLDOWN_MS,
+        );
+        if (nextAllowedAt > new Date()) {
+          const daysLeft = Math.ceil(
+            (nextAllowedAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+          );
+          throw new BadRequestException(
+            `You can change your username again in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`,
+          );
+        }
+      }
+
       const taken = await prisma.user.findUnique({
         where: { username: input.username },
       });
@@ -264,6 +286,7 @@ export class AuthService {
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.username !== undefined ? { username: input.username } : {}),
+        ...(isChangingUsername ? { usernameChangedAt: new Date() } : {}),
         ...(input.avatarUrl !== undefined
           ? { avatarUrl: input.avatarUrl }
           : {}),

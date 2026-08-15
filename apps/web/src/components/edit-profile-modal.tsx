@@ -14,6 +14,8 @@ function initials(name: string | undefined): string {
   return (first + last).toUpperCase();
 }
 
+const USERNAME_COOLDOWN_DAYS = 14;
+
 export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const { user, authFetch, updateUser } = useAuth();
 
@@ -22,6 +24,13 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [now] = useState(() => Date.now());
+  const daysSinceChange = user?.usernameChangedAt
+    ? (now - new Date(user.usernameChangedAt).getTime()) / (24 * 60 * 60 * 1000)
+    : Infinity;
+  const usernameLocked = daysSinceChange < USERNAME_COOLDOWN_DAYS;
+  const daysUntilUnlocked = Math.ceil(USERNAME_COOLDOWN_DAYS - daysSinceChange);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -81,20 +90,27 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
 
           <label className="block space-y-1.5">
             <span className="text-xs uppercase tracking-wide text-ink-soft">Username</span>
-            <div className="flex items-center rounded-lg border border-surface-border bg-bg px-3 focus-within:ring-2 focus-within:ring-ring">
+            <div
+              className={`flex items-center rounded-lg border border-surface-border bg-bg px-3 focus-within:ring-2 focus-within:ring-ring ${
+                usernameLocked ? "opacity-60" : ""
+              }`}
+            >
               <span className="text-sm text-ink-soft">@</span>
               <input
                 required
+                disabled={usernameLocked}
                 minLength={3}
                 maxLength={20}
                 pattern="[a-z][a-z0-9_]{2,19}"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                className="w-full bg-transparent py-2 pl-1 text-sm text-ink outline-none"
+                className="w-full bg-transparent py-2 pl-1 text-sm text-ink outline-none disabled:cursor-not-allowed"
               />
             </div>
             <span className="block text-[11px] text-ink-soft">
-              Lowercase letters, numbers, underscores — starts with a letter.
+              {usernameLocked
+                ? `You can change your username again in ${daysUntilUnlocked} day${daysUntilUnlocked === 1 ? "" : "s"}.`
+                : "Lowercase letters, numbers, underscores — starts with a letter. Can be changed once every 14 days."}
             </span>
           </label>
 
