@@ -86,7 +86,7 @@ export class AuthController {
     body: RequestMagicLinkInput,
   ) {
     const url = await this.authService.createMagicLink(body.email);
-    this.emailService.sendMagicLink(body.email, url);
+    await this.emailService.sendMagicLink(body.email, url);
 
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     return {
