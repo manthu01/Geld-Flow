@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useState, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
-import { motion } from "motion/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { API_URL, login } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { GlassCard } from "@/components/glass-card";
-import { FadeSwap, Reveal } from "@/components/motion-primitives";
-import { API_URL, requestMagicLink } from "@/lib/api";
+import { Reveal } from "@/components/motion-primitives";
 
 function LoginError() {
   const params = useSearchParams();
@@ -21,34 +21,6 @@ function LoginError() {
       </svg>
       That link is invalid or has expired. Request a new one below.
     </div>
-  );
-}
-
-function CheckmarkBurst() {
-  return (
-    <motion.div
-      initial={{ scale: 0.6, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 18 }}
-      className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-owed/15 text-owed"
-    >
-      <motion.svg
-        viewBox="0 0 24 24"
-        fill="none"
-        className="h-6 w-6"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
-      >
-        <motion.path
-          d="M5 13l4 4L19 7"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </motion.svg>
-    </motion.div>
   );
 }
 
@@ -76,19 +48,20 @@ function GoogleLogo() {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { completeLogin } = useAuth();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [devLink, setDevLink] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setStatus("sending");
+    setStatus("loading");
     setErrorMessage(null);
     try {
-      const result = await requestMagicLink(email);
-      setDevLink(result.devLink ?? null);
-      setStatus("sent");
+      const result = await login(email);
+      completeLogin(result);
+      router.replace("/");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Something went wrong.");
       setStatus("error");
@@ -107,7 +80,7 @@ export default function LoginPage() {
             Sign in to Geld Flow
           </h1>
           <p className="text-sm text-ink-soft">
-            No password needed — we&rsquo;ll email you a link.
+            No password, no verification email — just your address.
           </p>
         </div>
 
@@ -116,87 +89,48 @@ export default function LoginPage() {
         </Suspense>
 
         <GlassCard className="overflow-hidden p-6">
-          <FadeSwap id={status === "sent" ? "sent" : "form"}>
-            {status === "sent" ? (
-              <div className="space-y-4 text-center">
-                <CheckmarkBurst />
-                <div className="space-y-1">
-                  <p className="text-sm text-ink">
-                    Check <span className="font-medium">{email}</span> for a sign-in
-                    link.
-                  </p>
-                  <p className="text-xs text-ink-soft">
-                    It&rsquo;ll expire in 15 minutes — keep this tab open.
-                  </p>
-                </div>
+          <div className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <label className="block space-y-1.5">
+                <span className="text-xs uppercase tracking-wide text-ink-soft">
+                  Email
+                </span>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </label>
+              {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
+              <button
+                type="submit"
+                disabled={status === "loading"}
+                className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
+              >
+                {status === "loading" ? "Signing in…" : "Continue"}
+              </button>
+              <p className="text-center text-xs text-ink-soft">
+                First time? This creates your account — no separate sign-up.
+              </p>
+            </form>
 
-                {devLink && (
-                  <div className="space-y-1.5 rounded-lg border border-dashed border-surface-border bg-bg px-3 py-2.5 text-left">
-                    <span className="inline-block rounded-full bg-accent-tint px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-strong">
-                      Dev mode
-                    </span>
-                    <a
-                      href={devLink}
-                      className="block break-all font-mono text-[11px] leading-relaxed text-accent-strong underline underline-offset-2"
-                    >
-                      {devLink}
-                    </a>
-                  </div>
-                )}
+            <div className="flex items-center gap-3 text-xs text-ink-soft">
+              <span className="h-px flex-1 bg-surface-border" />
+              or
+              <span className="h-px flex-1 bg-surface-border" />
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatus("idle");
-                    setDevLink(null);
-                  }}
-                  className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink"
-                >
-                  Use a different email
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <label className="block space-y-1.5">
-                    <span className="text-xs uppercase tracking-wide text-ink-soft">
-                      Email
-                    </span>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  </label>
-                  {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
-                  <button
-                    type="submit"
-                    disabled={status === "sending"}
-                    className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
-                  >
-                    {status === "sending" ? "Sending…" : "Send sign-in link"}
-                  </button>
-                </form>
-
-                <div className="flex items-center gap-3 text-xs text-ink-soft">
-                  <span className="h-px flex-1 bg-surface-border" />
-                  or
-                  <span className="h-px flex-1 bg-surface-border" />
-                </div>
-
-                <a
-                  href={`${API_URL}/auth/google`}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
-                >
-                  <GoogleLogo />
-                  Continue with Google
-                </a>
-              </div>
-            )}
-          </FadeSwap>
+            <a
+              href={`${API_URL}/auth/google`}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
+            >
+              <GoogleLogo />
+              Continue with Google
+            </a>
+          </div>
         </GlassCard>
       </Reveal>
     </main>

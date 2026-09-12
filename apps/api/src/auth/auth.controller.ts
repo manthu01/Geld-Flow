@@ -4,7 +4,6 @@ import {
   Get,
   Patch,
   Post,
-  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -14,9 +13,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
-  requestMagicLinkSchema,
+  loginSchema,
   updateProfileSchema,
-  type RequestMagicLinkInput,
+  type LoginInput,
   type UpdateProfileInput,
 } from '@geld-flow/shared';
 import type { User } from '@geld-flow/db';
@@ -26,7 +25,6 @@ import {
   REFRESH_COOKIE_NAME,
   REFRESH_COOKIE_PATH,
 } from './auth.service';
-import { EmailService } from '../email/email.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleConfiguredGuard } from './guards/google-configured.guard';
@@ -47,7 +45,6 @@ function toProfileView(user: User) {
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly emailService: EmailService,
     private readonly config: ConfigService,
   ) {}
 
@@ -77,42 +74,27 @@ export class AuthController {
     );
   }
 
-  // ---------------------------------------------------------- Magic link
+  // -------------------------------------------------------------- Login
 
-  @Post('magic-link')
-  @Throttle({ default: { limit: 5, ttl: 900_000 } })
-  async requestMagicLink(
-    @Body(new ZodValidationPipe(requestMagicLinkSchema))
-    body: RequestMagicLinkInput,
+  /**
+   * No password, no verification link — an email is the whole account.
+   * First sign-in creates the account (with an auto-generated username);
+   * every sign-in after that just logs the same account back in.
+   */
+  @Post('login')
+  @Throttle({ default: { limit: 20, ttl: 900_000 } })
+  async login(
+    @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    const url = await this.authService.createMagicLink(body.email);
-    await this.emailService.sendMagicLink(body.email, url);
-
-    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
-    return {
-      message: 'Check your email for a sign-in link.',
-      // Only in dev: lets you test the flow without a real inbox.
-      ...(isProduction ? {} : { devLink: url }),
-    };
-  }
-
-  @Get('magic-link/verify')
-  async verifyMagicLink(
-    @Query('token') token: string | undefined,
-    @Res() res: Response,
-  ) {
-    const user = token ? await this.authService.redeemMagicLink(token) : null;
-    if (!user) {
-      return res.redirect(`${this.webAppUrl}/login?error=invalid_link`);
-    }
-
+    const user = await this.authService.findOrCreateByEmail(body.email);
     const tokens = await this.authService.issueTokens(user.id, user.email);
     this.setRefreshCookie(
       res,
       tokens.refreshToken,
       tokens.refreshTokenExpiresAt,
     );
-    return res.redirect(`${this.webAppUrl}/auth/callback`);
+    return { accessToken: tokens.accessToken, user: toProfileView(user) };
   }
 
   // -------------------------------------------------------------- Google

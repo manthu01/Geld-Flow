@@ -19,7 +19,7 @@ export class GoogleConfiguredGuard implements CanActivate {
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET');
     if (!clientId || !clientSecret) {
       throw new ServiceUnavailableException(
-        'Google sign-in is not configured on this server yet. Use magic-link sign-in instead.',
+        'Google sign-in is not configured on this server yet. Sign in with your email instead.',
       );
     }
     return true;

@@ -23,19 +23,23 @@ function readErrorMessage(data: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
-export async function requestMagicLink(
-  email: string,
-): Promise<{ message: string; devLink?: string }> {
-  const res = await fetch(`${API_URL}/auth/magic-link`, {
+/**
+ * The whole sign-in flow: no password, no verification link. Typing an
+ * email logs you in — the account is created automatically the first
+ * time a given email shows up.
+ */
+export async function login(email: string): Promise<RefreshResponse> {
+  const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ email }),
   });
   const data: unknown = await res.json();
   if (!res.ok) {
     throw new Error(readErrorMessage(data));
   }
-  return data as { message: string; devLink?: string };
+  return data as RefreshResponse;
 }
 
 /** Exchanges the httpOnly refresh cookie for a fresh access token. Returns null if there's no valid session. */

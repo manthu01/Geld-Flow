@@ -2,12 +2,14 @@ import { z } from "zod";
 
 /**
  * Auth. Shared so the login form and the API validate email addresses
- * with the exact same rule.
+ * with the exact same rule. Signing in is intentionally just "type your
+ * email" — no password, no verification link — with an account
+ * auto-created on first use.
  */
-export const requestMagicLinkSchema = z.object({
+export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
 });
-export type RequestMagicLinkInput = z.infer<typeof requestMagicLinkSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
 
 // Username is a separate, unique handle from the display `name` — every
 // account gets one auto-generated at signup, editable any time after.

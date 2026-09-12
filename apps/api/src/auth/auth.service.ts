@@ -14,7 +14,6 @@ export const REFRESH_COOKIE_NAME = 'refresh_token';
 export const REFRESH_COOKIE_PATH = '/auth';
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const USERNAME_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 export interface GoogleProfileInput {
@@ -67,54 +66,22 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  // ---------------------------------------------------------- Magic link
-
-  /** Creates a single-use magic-link token and returns the URL to email. */
-  async createMagicLink(email: string): Promise<string> {
-    const rawToken = randomBytes(32).toString('hex');
-    await prisma.magicLinkToken.create({
-      data: {
-        email,
-        tokenHash: hashToken(rawToken),
-        expiresAt: new Date(Date.now() + MAGIC_LINK_TTL_MS),
-      },
-    });
-
-    const apiBaseUrl =
-      this.config.get<string>('API_BASE_URL') ??
-      `http://localhost:${this.config.get<string>('PORT') ?? '4000'}`;
-    return `${apiBaseUrl}/auth/magic-link/verify?token=${rawToken}`;
-  }
+  // ------------------------------------------------------------- Email
 
   /**
-   * Redeems a magic-link token: marks it used (single-use, even if the
-   * request fails downstream) and finds or creates the matching user.
-   * Returns null for an invalid, expired, or already-used token.
+   * Signing in is just "type your email" — no password, no verification
+   * link. Finds the matching account or creates one on first use, so
+   * every unique email maps to exactly one auto-named, auto-usernamed
+   * user.
    */
-  async redeemMagicLink(rawToken: string): Promise<User | null> {
-    const tokenHash = hashToken(rawToken);
-    const record = await prisma.magicLinkToken.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!record || record.usedAt || record.expiresAt < new Date()) {
-      return null;
-    }
-
-    await prisma.magicLinkToken.update({
-      where: { id: record.id },
-      data: { usedAt: new Date() },
-    });
-
-    const existing = await prisma.user.findUnique({
-      where: { email: record.email },
-    });
+  async findOrCreateByEmail(email: string): Promise<User> {
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return existing;
 
-    const localPart = record.email.split('@')[0] ?? 'user';
+    const localPart = email.split('@')[0] ?? 'user';
     return prisma.user.create({
       data: {
-        email: record.email,
+        email,
         name: localPart,
         username: await generateUniqueUsername(localPart),
       },
@@ -125,8 +92,8 @@ export class AuthService {
 
   /**
    * Links a Google identity to an existing account (matched by email) or
-   * creates a new one. Lets someone who first signed up via magic-link
-   * later sign in with Google using the same email, and vice versa.
+   * creates a new one. Lets someone who first signed up with plain email
+   * login later sign in with Google using the same email, and vice versa.
    */
   async findOrCreateGoogleUser(input: GoogleProfileInput): Promise<User> {
     const existingIdentity = await prisma.authIdentity.findUnique({

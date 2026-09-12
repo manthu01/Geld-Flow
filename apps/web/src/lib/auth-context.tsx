@@ -9,7 +9,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { API_URL, logoutSession, refreshSession, type CurrentUser } from "./api";
+import {
+  API_URL,
+  logoutSession,
+  refreshSession,
+  type CurrentUser,
+  type RefreshResponse,
+} from "./api";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -24,6 +30,8 @@ interface AuthContextValue {
   authFetch: (path: string, init?: RequestInit) => Promise<Response>;
   /** Patches the cached user profile after a successful edit, without a full session restore. */
   updateUser: (user: CurrentUser) => void;
+  /** Adopts a session returned directly from /auth/login, without a round-trip through the refresh cookie. */
+  completeLogin: (result: RefreshResponse) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,6 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return promise;
   }, []);
 
+  const completeLogin = useCallback((result: RefreshResponse) => {
+    setUser(result.user);
+    setAccessToken(result.accessToken);
+    accessTokenRef.current = result.accessToken;
+    setStatus("authenticated");
+  }, []);
+
   const logout = useCallback(async () => {
     await logoutSession();
     setUser(null);
@@ -104,7 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ status, user, accessToken, restoreSession, logout, authFetch, updateUser: setUser }}
+      value={{
+        status,
+        user,
+        accessToken,
+        restoreSession,
+        logout,
+        authFetch,
+        updateUser: setUser,
+        completeLogin,
+      }}
     >
       {children}
     </AuthContext.Provider>

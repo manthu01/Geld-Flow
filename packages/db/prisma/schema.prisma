@@ -135,20 +135,6 @@ model AuthIdentity {
   @@map("auth_identities")
 }
 
-// Passwordless login tokens. Single-use: usedAt is set the moment the
-// token is redeemed so a leaked link can't be replayed.
-model MagicLinkToken {
-  id        String    @id @default(uuid())
-  email     String
-  tokenHash String    @unique @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@index([email])
-  @@map("magic_link_tokens")
-}
-
 model RefreshToken {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
@@ -398,7 +384,7 @@ model ChatLink {
 
 // Short-lived, single-use code shown on a ledger's page and redeemed via
 // "/link CODE" in Telegram to create that ledger's ChatLink — the same
-// generate-a-token-then-redeem-it shape as MagicLinkToken and Invite.
+// generate-a-token-then-redeem-it shape as Invite.
 model TelegramLinkCode {
   id          String    @id @default(uuid())
   code        String    @unique

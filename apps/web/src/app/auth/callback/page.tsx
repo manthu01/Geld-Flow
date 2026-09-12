@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
 /**
- * Landing spot after magic-link verification or the Google OAuth
- * callback — both just set the httpOnly refresh cookie and redirect
- * here. AuthProvider already kicks off the session restore on mount, so
- * this page only watches its result rather than triggering a second,
+ * Landing spot after the Google OAuth callback, which sets the httpOnly
+ * refresh cookie server-side and redirects here (plain email login skips
+ * this entirely — it completes the session directly on the login page).
+ * AuthProvider already kicks off the session restore on mount, so this
+ * page only watches its result rather than triggering a second,
  * redundant refresh call against the same single-use cookie.
  */
 export default function AuthCallbackPage() {

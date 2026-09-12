@@ -6,7 +6,7 @@ An expense-splitting platform for groups and pairs — IOU ledger, live activity
 
 All planned phases are built:
 
-- **Phase 0** — monorepo foundation, auth (magic-link + Google OAuth)
+- **Phase 0** — monorepo foundation, auth (plain email login + Google OAuth)
 - **Phase 1** — core engine: ledgers, expenses (equal/percentage/exact splits), balances, settlements, activity feed
 - **Phase 2** — reputation/rank system, debt-simplification for groups
 - **Phase 3** — Telegram bot, contextual Travel/Event dashboards
@@ -37,7 +37,7 @@ pnpm dev:api                  # http://localhost:4000
 pnpm dev:web                  # http://localhost:3000
 ```
 
-Copy `apps/api/.env.example` to `apps/api/.env` before starting the API. In dev mode, magic-link emails aren't actually sent — the sign-in link is shown directly on the login page instead (`EmailService` just logs it).
+Copy `apps/api/.env.example` to `apps/api/.env` before starting the API. Signing in only ever needs an email address — no password, no verification email to configure.
 
 ### Running checks
 
@@ -56,7 +56,7 @@ All live in `apps/api/.env` (see `apps/api/.env.example` for the template). Ever
 |---|---|---|
 | `NODE_ENV` | | `development` \| `production` \| `test` |
 | `PORT` | | API port (default 4000) |
-| `API_BASE_URL` | | Public base URL of the API, used to build magic-link and invite URLs |
+| `API_BASE_URL` | | Public base URL of the API, used to build invite URLs |
 | `WEB_APP_URL` | | Frontend origin, used for CORS and post-auth redirects |
 | `DATABASE_URL` | ✅ | Postgres connection string |
 | `REDIS_URL` | | Reserved for future session/cache use |
@@ -79,7 +79,7 @@ Missing `DATABASE_URL` or a too-short `JWT_ACCESS_SECRET` fails startup immediat
 
 ## Architecture notes
 
-- **Auth**: passwordless magic-link (single-use, hashed, 15-min expiry) or Google OAuth, both issuing a short-lived JWT access token plus a rotating httpOnly refresh cookie. Refresh rotation is atomic (`UPDATE ... WHERE revoked_at IS NULL`) to survive concurrent refresh attempts safely.
+- **Auth**: sign in with just an email address (no password, no verification link — the account is created on first use) or Google OAuth, both issuing a short-lived JWT access token plus a rotating httpOnly refresh cookie. Refresh rotation is atomic (`UPDATE ... WHERE revoked_at IS NULL`) to survive concurrent refresh attempts safely.
 - **Splits**: `equal` / `percentage` / `exact`, computed server-side in integer cents so shares always sum exactly to the total — no float drift, remainder cents distributed deterministically.
 - **Debt simplification**: a pure, DB-free util (`simplifyDebts`) doing greedy largest-creditor/largest-debtor matching — at most n-1 transfers for n participants. Groups only; a personal ledger is already just two people.
 - **Telegram bot**: long-polls Telegram's `getUpdates` (no public webhook needed for local dev). One chat maps to one ledger via a short-lived link code generated from that ledger's page. Expense messages ("Paid $40 for pizza @Alex") are parsed and matched to members by pure, unit-tested utilities — an ambiguous or unmatched name is never guessed at.
@@ -87,7 +87,7 @@ Missing `DATABASE_URL` or a too-short `JWT_ACCESS_SECRET` fails startup immediat
 
 ## Security
 
-- Rate limiting (`@nestjs/throttler`): a global default plus a tighter limit on magic-link requests specifically (the cheapest endpoint to abuse for email spam).
+- Rate limiting (`@nestjs/throttler`): a global default plus a tighter limit on login requests specifically (the cheapest endpoint to abuse for account creation spam).
 - `helmet` for standard security headers.
 - CORS restricted to `WEB_APP_URL` with credentials.
 - Every mutating endpoint validates its body against a Zod schema shared with the frontend.
