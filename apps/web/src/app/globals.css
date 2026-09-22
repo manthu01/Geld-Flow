@@ -99,6 +99,17 @@ body {
   pointer-events: none;
 }
 
+/* Sized to match .aurora exactly so a blob's own top/left/right/bottom
+   percentages still resolve correctly once this layer picks up a
+   pointer-driven transform (see aurora-background.tsx) — nesting the
+   transforms this way means the parallax offset and the CSS drift
+   keyframes each own their own element's `transform` instead of
+   fighting over one. */
+.aurora__layer {
+  position: absolute;
+  inset: 0;
+}
+
 .aurora__blob {
   position: absolute;
   border-radius: 9999px;

@@ -1,6 +1,7 @@
 "use client";
 
 import { GlassCard } from "@/components/glass-card";
+import { AnimatedNumber, Reveal } from "@/components/motion-primitives";
 import type { ExpenseView } from "@/lib/api";
 
 export function TripStatsPanel({
@@ -29,23 +30,25 @@ export function TripStatsPanel({
   const perDay = totalSpent / spanDays;
 
   return (
-    <section className="space-y-3">
+    <Reveal className="space-y-3">
       <h2 className="font-display text-lg font-medium">Trip stats</h2>
       <GlassCard className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-soft">Total spent</p>
           <p className="font-mono text-lg font-medium text-ink">
-            {totalSpent.toFixed(2)} {currency}
+            <AnimatedNumber value={totalSpent} decimals={2} /> {currency}
           </p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-soft">Expenses</p>
-          <p className="font-mono text-lg font-medium text-ink">{expenses.length}</p>
+          <p className="font-mono text-lg font-medium text-ink">
+            <AnimatedNumber value={expenses.length} />
+          </p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-soft">Per day</p>
           <p className="font-mono text-lg font-medium text-ink">
-            {perDay.toFixed(2)} {currency}
+            <AnimatedNumber value={perDay} decimals={2} /> {currency}
           </p>
         </div>
       </GlassCard>
@@ -59,6 +62,6 @@ export function TripStatsPanel({
           </div>
         ))}
       </GlassCard>
-    </section>
+    </Reveal>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { GlassCard } from "@/components/glass-card";
 import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
@@ -21,6 +22,7 @@ export function ChecklistPanel({
   members: LedgerMemberView[];
 }) {
   const { authFetch } = useAuth();
+  const reduce = useReducedMotion();
   const [items, setItems] = useState<ChecklistItemView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,29 +122,39 @@ export function ChecklistPanel({
         <EmptyState title="No tasks yet" />
       ) : (
         <GlassCard className="divide-y divide-surface-border p-0">
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between px-4 py-3">
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={item.isDone}
-                  onChange={() => handleToggle(item)}
-                />
-                <span className={item.isDone ? "text-ink-soft line-through" : ""}>
-                  {item.title}
-                </span>
-                {item.assignedTo && (
-                  <span className="text-xs text-ink-soft">· {item.assignedTo.name}</span>
-                )}
-              </label>
-              <button
-                onClick={() => handleDelete(item)}
-                className="text-xs text-owes underline underline-offset-2"
+          <AnimatePresence initial={false}>
+            {items.map((item) => (
+              <motion.div
+                key={item.id}
+                layout={!reduce}
+                initial={reduce ? false : { opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={reduce ? undefined : { opacity: 0, height: 0 }}
+                transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 36 }}
+                className="flex items-center justify-between overflow-hidden px-4 py-3"
               >
-                Remove
-              </button>
-            </div>
-          ))}
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={item.isDone}
+                    onChange={() => handleToggle(item)}
+                  />
+                  <span className={item.isDone ? "text-ink-soft line-through" : ""}>
+                    {item.title}
+                  </span>
+                  {item.assignedTo && (
+                    <span className="text-xs text-ink-soft">· {item.assignedTo.name}</span>
+                  )}
+                </label>
+                <button
+                  onClick={() => handleDelete(item)}
+                  className="text-xs text-owes underline underline-offset-2"
+                >
+                  Remove
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </GlassCard>
       )}
     </section>

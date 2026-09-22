@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { GlassCard } from "@/components/glass-card";
+import { FadeSwap } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import { createTelegramLinkCode, getTelegramStatus } from "@/lib/api";
 
@@ -45,40 +46,42 @@ export function TelegramConnect({ ledgerId }: { ledgerId: string }) {
 
   return (
     <section className="space-y-2">
-      {!code ? (
-        <button
-          onClick={handleConnect}
-          className="rounded-lg border border-surface-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong"
-        >
-          Connect Telegram
-        </button>
-      ) : (
-        <GlassCard className="space-y-1 p-4 text-sm text-ink">
-          <p>
-            1. Add{" "}
-            {botUsername ? (
-              <a
-                href={`https://t.me/${botUsername}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent-strong underline underline-offset-2"
-              >
-                @{botUsername}
-              </a>
-            ) : (
-              "the bot"
-            )}{" "}
-            to your trip&apos;s Telegram chat.
-          </p>
-          <p>
-            2. Send <span className="font-mono">/link {code}</span> in that chat (expires in 15
-            minutes).
-          </p>
-          <p className="text-xs text-ink-soft">
-            Then log expenses right from the chat: “Paid $40 for pizza @Alex”.
-          </p>
-        </GlassCard>
-      )}
+      <FadeSwap id={code ? "code" : "button"}>
+        {!code ? (
+          <button
+            onClick={handleConnect}
+            className="rounded-lg border border-surface-border bg-bg-elevated px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-strong"
+          >
+            Connect Telegram
+          </button>
+        ) : (
+          <GlassCard className="space-y-1 p-4 text-sm text-ink">
+            <p>
+              1. Add{" "}
+              {botUsername ? (
+                <a
+                  href={`https://t.me/${botUsername}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent-strong underline underline-offset-2"
+                >
+                  @{botUsername}
+                </a>
+              ) : (
+                "the bot"
+              )}{" "}
+              to your trip&apos;s Telegram chat.
+            </p>
+            <p>
+              2. Send <span className="font-mono">/link {code}</span> in that chat (expires in 15
+              minutes).
+            </p>
+            <p className="text-xs text-ink-soft">
+              Then log expenses right from the chat: “Paid $40 for pizza @Alex”.
+            </p>
+          </GlassCard>
+        )}
+      </FadeSwap>
       {error && <p className="text-sm text-owes">{error}</p>}
     </section>
   );

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { EditProfileModal } from "@/components/edit-profile-modal";
+import { PageTransition } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import { getMyScore, listMyLedgers, type LedgerSummary, type ScoreView } from "@/lib/api";
 
@@ -15,17 +17,39 @@ const NAV_ITEMS = [
   { href: "/about", label: "About" },
 ] as const;
 
-function NavLink({ href, label, onNavigate }: { href: string; label: string; onNavigate: () => void }) {
+function NavLink({
+  href,
+  label,
+  onNavigate,
+  pill = false,
+}: {
+  href: string;
+  label: string;
+  onNavigate: () => void;
+  /** Draws the active state as a shared-layout pill that slides between links, instead of a static background. Only ever pass this for a nav that renders once at a time — a second simultaneously-mounted copy sharing the same layoutId would fight it for the animation. */
+  pill?: boolean;
+}) {
   const pathname = usePathname();
   const active = pathname === href;
   return (
     <Link
       href={href}
       onClick={onNavigate}
-      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-        active ? "bg-accent-tint text-accent-strong" : "text-ink-soft hover:bg-surface-strong hover:text-ink"
+      className={`relative rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? pill
+            ? "text-accent-strong"
+            : "bg-accent-tint text-accent-strong"
+          : "text-ink-soft hover:bg-surface-strong hover:text-ink"
       }`}
     >
+      {pill && active && (
+        <motion.span
+          layoutId="header-nav-pill"
+          className="absolute inset-0 -z-10 rounded-lg bg-accent-tint"
+          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+        />
+      )}
       {label}
     </Link>
   );
@@ -156,6 +180,7 @@ function Avatar({ name, avatarUrl, className }: { name: string | undefined; avat
 function ProfileMenu() {
   const { user, logout } = useAuth();
   const { score } = useLedgerNav();
+  const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -180,43 +205,55 @@ function ProfileMenu() {
         <Avatar name={user?.name} avatarUrl={user?.avatarUrl} className="h-9 w-9 text-xs" />
       </button>
 
-      {open && (
-        <div className="animate-fade-in-up absolute right-0 top-11 z-50 w-56 rounded-xl border border-surface-border bg-bg-elevated p-3 shadow-[var(--glass-shadow)]">
-          <p className="truncate px-1 text-sm font-medium text-ink">{user?.name}</p>
-          <p className="truncate px-1 font-mono text-xs text-accent-strong">@{user?.username}</p>
-          <p className="truncate px-1 text-xs text-ink-soft">{user?.email}</p>
-          {score && (
-            <p className="mt-1 px-1 font-mono text-xs text-ink-soft">
-              Rank {score.currentRank} · {score.confirmedSettlements} settled
-            </p>
-          )}
-          <div className="mt-3 space-y-0.5 border-t border-surface-border pt-2">
-            <button
-              onClick={() => {
-                setEditing(true);
-                setOpen(false);
-              }}
-              className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
-            >
-              Edit profile
-            </button>
-            <button
-              onClick={() => void logout()}
-              className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={reduce ? false : { opacity: 0, scale: 0.94, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={reduce ? undefined : { opacity: 0, scale: 0.96, y: -4 }}
+            transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }}
+            className="absolute right-0 top-11 z-50 w-56 origin-top-right rounded-xl border border-surface-border bg-bg-elevated p-3 shadow-[var(--glass-shadow)]"
+          >
+            <p className="truncate px-1 text-sm font-medium text-ink">{user?.name}</p>
+            <p className="truncate px-1 font-mono text-xs text-accent-strong">@{user?.username}</p>
+            <p className="truncate px-1 text-xs text-ink-soft">{user?.email}</p>
+            {score && (
+              <p className="mt-1 px-1 font-mono text-xs text-ink-soft">
+                Rank {score.currentRank} · {score.confirmedSettlements} settled
+              </p>
+            )}
+            <div className="mt-3 space-y-0.5 border-t border-surface-border pt-2">
+              <button
+                onClick={() => {
+                  setEditing(true);
+                  setOpen(false);
+                }}
+                className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
+              >
+                Edit profile
+              </button>
+              <button
+                onClick={() => void logout()}
+                className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
+              >
+                Sign out
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {editing && <EditProfileModal onClose={() => setEditing(false)} />}
+      <AnimatePresence>
+        {editing && <EditProfileModal onClose={() => setEditing(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const pathname = usePathname();
+  const reduce = useReducedMotion();
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
@@ -226,18 +263,30 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setDrawerOpen(false)}
-            aria-hidden="true"
-          />
-          <aside className="animate-slide-in-left absolute inset-y-0 left-0 w-72 border-r border-surface-border bg-bg-elevated px-4 py-5 shadow-2xl">
-            <SidebarContent onNavigate={() => setDrawerOpen(false)} />
-          </aside>
-        </div>
-      )}
+      <AnimatePresence>
+        {drawerOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <motion.div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setDrawerOpen(false)}
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduce ? 0 : 0.2 }}
+            />
+            <motion.aside
+              className="absolute inset-y-0 left-0 w-72 border-r border-surface-border bg-bg-elevated px-4 py-5 shadow-2xl"
+              initial={reduce ? false : { x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={reduce ? undefined : { x: "-100%" }}
+              transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 340, damping: 34 }}
+            >
+              <SidebarContent onNavigate={() => setDrawerOpen(false)} />
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-surface-border bg-bg/70 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-10">
@@ -263,7 +312,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <nav className="hidden gap-1 lg:flex">
             {NAV_ITEMS.map((item) => (
-              <NavLink key={item.href} {...item} onNavigate={() => {}} />
+              <NavLink key={item.href} {...item} onNavigate={() => {}} pill />
             ))}
           </nav>
 
@@ -272,7 +321,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</main>
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+          <PageTransition routeKey={pathname}>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );

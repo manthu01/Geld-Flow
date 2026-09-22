@@ -1,7 +1,13 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
-import type { ReactNode } from "react";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  useSpring,
+  type Variants,
+} from "motion/react";
+import { useEffect, useState, type ReactNode } from "react";
 
 const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
 
@@ -108,6 +114,66 @@ export function FadeSwap({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.3, ease: EASE_OUT_EXPO }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+/**
+ * A number that eases toward its target instead of snapping — for stat
+ * tiles where the underlying value can change (a new expense lands, a
+ * settlement confirms). Renders the plain final value with no animation
+ * for reduced-motion users.
+ */
+export function AnimatedNumber({
+  value,
+  decimals = 0,
+}: {
+  value: number;
+  decimals?: number;
+}) {
+  const reduce = useReducedMotion();
+  const spring = useSpring(value, { stiffness: 140, damping: 22, mass: 0.6 });
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    if (!reduce) spring.set(value);
+  }, [value, reduce, spring]);
+
+  useEffect(() => {
+    if (reduce) return;
+    return spring.on("change", setDisplay);
+  }, [reduce, spring]);
+
+  return <>{(reduce ? value : display).toFixed(decimals)}</>;
+}
+
+/**
+ * Fades + slides in the current route's content, keyed by pathname, so
+ * navigating between pages never feels like a hard cut. Lives inside the
+ * app shell's <main> rather than the root layout, so the sidebar/header
+ * never re-mount — only the page content transitions.
+ */
+export function PageTransition({
+  routeKey,
+  children,
+}: {
+  routeKey: string;
+  children: ReactNode;
+}) {
+  const reduce = useReducedMotion();
+  if (reduce) return <>{children}</>;
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={routeKey}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.25, ease: EASE_OUT_EXPO }}
       >
         {children}
       </motion.div>

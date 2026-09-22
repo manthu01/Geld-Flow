@@ -42,14 +42,24 @@ export async function login(email: string): Promise<RefreshResponse> {
   return data as RefreshResponse;
 }
 
-/** Exchanges the httpOnly refresh cookie for a fresh access token. Returns null if there's no valid session. */
+/**
+ * Exchanges the httpOnly refresh cookie for a fresh access token. Returns
+ * null if there's no valid session — including when the API is simply
+ * unreachable (network error), so a down/misconfigured API degrades to
+ * "signed out" instead of crashing the whole app on the mount-time
+ * session restore every page depends on.
+ */
 export async function refreshSession(): Promise<RefreshResponse | null> {
-  const res = await fetch(`${API_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as RefreshResponse;
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as RefreshResponse;
+  } catch {
+    return null;
+  }
 }
 
 export async function logoutSession(): Promise<void> {

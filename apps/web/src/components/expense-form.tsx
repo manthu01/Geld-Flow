@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { GlassCard } from "@/components/glass-card";
+import { Reveal } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import {
   createExpense,
@@ -113,6 +115,7 @@ export function ExpenseForm({
   }
 
   return (
+    <Reveal>
     <GlassCard className="space-y-4 p-5">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -193,33 +196,45 @@ export function ExpenseForm({
                     />
                     {m.user.name}
                   </label>
-                  {p?.included && splitType === "exact" && (
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={p.amount}
-                      onChange={(e) =>
-                        updateParticipant(m.userId, { amount: e.target.value })
-                      }
-                      placeholder="0.00"
-                      className="w-24 rounded-lg border border-surface-border bg-bg px-2 py-1 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  )}
-                  {p?.included && splitType === "percentage" && (
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={p.percentage}
-                      onChange={(e) =>
-                        updateParticipant(m.userId, { percentage: e.target.value })
-                      }
-                      placeholder="%"
-                      className="w-20 rounded-lg border border-surface-border bg-bg px-2 py-1 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  )}
+                  <AnimatePresence initial={false}>
+                    {p?.included && splitType === "exact" && (
+                      <motion.input
+                        key="exact"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={p.amount}
+                        onChange={(e) =>
+                          updateParticipant(m.userId, { amount: e.target.value })
+                        }
+                        placeholder="0.00"
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "6rem" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="rounded-lg border border-surface-border bg-bg px-2 py-1 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    )}
+                    {p?.included && splitType === "percentage" && (
+                      <motion.input
+                        key="percentage"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={p.percentage}
+                        onChange={(e) =>
+                          updateParticipant(m.userId, { percentage: e.target.value })
+                        }
+                        placeholder="%"
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "5rem" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="rounded-lg border border-surface-border bg-bg px-2 py-1 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
@@ -246,5 +261,6 @@ export function ExpenseForm({
         </div>
       </form>
     </GlassCard>
+    </Reveal>
   );
 }
