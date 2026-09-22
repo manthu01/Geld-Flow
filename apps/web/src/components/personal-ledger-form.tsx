@@ -33,8 +33,8 @@ export function PersonalLedgerForm() {
     try {
       const input =
         mode === "email"
-          ? { peerEmail: String(form.get("peerEmail") || ""), baseCurrency: "USD" }
-          : { peerName: String(form.get("peerName") || ""), baseCurrency: "USD" };
+          ? { peerEmail: String(form.get("peerEmail") || ""), baseCurrency: "INR" }
+          : { peerName: String(form.get("peerName") || ""), baseCurrency: "INR" };
       const { ledger, claimUrl } = await getOrCreatePersonalLedger(authFetch, input);
       if (claimUrl) {
         setCreated({ ledgerId: ledger.id, claimUrl });

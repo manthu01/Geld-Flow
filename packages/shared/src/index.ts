@@ -151,7 +151,7 @@ export const getOrCreatePersonalLedgerSchema = z
     // can add regardless of whether that person has signed up yet.
     peerEmail: z.string().trim().toLowerCase().email().optional(),
     peerName: z.string().trim().min(1).max(80).optional(),
-    baseCurrency: z.string().length(3).default("USD"),
+    baseCurrency: z.string().length(3).default("INR"),
   })
   .refine((val) => Boolean(val.peerEmail) !== Boolean(val.peerName), {
     message: "Provide either peerEmail or peerName, not both.",

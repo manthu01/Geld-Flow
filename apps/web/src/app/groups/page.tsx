@@ -50,7 +50,7 @@ export default function GroupsPage() {
       const ledger = await createGroupLedger(authFetch, {
         type: String(form.get("type")) as "group_general" | "group_travel" | "group_event",
         name: String(form.get("name") || "") || undefined,
-        baseCurrency: String(form.get("currency") || "USD"),
+        baseCurrency: String(form.get("currency") || "INR"),
       });
       router.push(`/ledgers/${ledger.id}`);
     } catch (err) {
@@ -96,7 +96,7 @@ export default function GroupsPage() {
                   <option value="group_event">Event</option>
                 </select>
               </div>
-              <input type="hidden" name="currency" value="USD" />
+              <input type="hidden" name="currency" value="INR" />
               {formError && <p className="text-sm text-owes">{formError}</p>}
               <button
                 type="submit"
