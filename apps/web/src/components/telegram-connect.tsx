@@ -77,7 +77,7 @@ export function TelegramConnect({ ledgerId }: { ledgerId: string }) {
               minutes).
             </p>
             <p className="text-xs text-ink-soft">
-              Then log expenses right from the chat: “Paid $40 for pizza @Alex”.
+              Then log expenses right from the chat: “Paid 40 for pizza @Alex”.
             </p>
           </GlassCard>
         )}

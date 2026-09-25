@@ -1,100 +1,37 @@
-"use client";
-
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-  useSpring,
-  type Variants,
-} from "motion/react";
-import { useEffect, useState, type ReactNode } from "react";
-
-const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
+import type { ReactNode } from "react";
 
 /**
- * Fades + slides an element in once it scrolls into view. Falls back to a
- * plain instant render when the user has reduced-motion enabled.
+ * These used to be Framer Motion wrappers (fade/slide/stagger reveals, an
+ * animated route-transition curtain, spring-driven numbers). They made
+ * every navigation and list render feel sluggish — the app's whole point
+ * is logging a transaction fast, and the animation layer was directly at
+ * odds with that. Kept as plain, static pass-throughs (same props, same
+ * call sites, zero behavior) rather than ripping them out of every
+ * caller, so this stays a one-file change.
  */
+
 export function Reveal({
   children,
-  delay = 0,
   className,
-  y = 20,
 }: {
   children: ReactNode;
   delay?: number;
   className?: string;
   y?: number;
 }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
-
-  return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.55, ease: EASE_OUT_EXPO, delay }}
-    >
-      {children}
-    </motion.div>
-  );
+  return <div className={className}>{children}</div>;
 }
 
-const staggerContainer: Variants = {
-  hidden: {},
-  show: {
-    transition: { staggerChildren: 0.06, delayChildren: 0.05 },
-  },
-};
-
-const staggerItem: Variants = {
-  hidden: { opacity: 0, y: 16, scale: 0.98 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.45, ease: EASE_OUT_EXPO },
-  },
-};
-
-/** Wrap a grid/list of <StaggerItem> children to reveal them one after another. */
 export function StaggerGroup({ children, className }: { children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
-
-  return (
-    <motion.div
-      className={className}
-      variants={staggerContainer}
-      initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, margin: "-40px" }}
-    >
-      {children}
-    </motion.div>
-  );
+  return <div className={className}>{children}</div>;
 }
 
 export function StaggerItem({ children, className }: { children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
-
-  return (
-    <motion.div className={className} variants={staggerItem}>
-      {children}
-    </motion.div>
-  );
+  return <div className={className}>{children}</div>;
 }
 
-/**
- * Crossfades between differently-keyed children — e.g. a form swapping
- * for its own success state. Give each state a distinct `id` so
- * AnimatePresence knows to exit the old one instead of just re-rendering.
- */
+/** Swaps content immediately — no crossfade. */
 export function FadeSwap({
-  id,
   children,
   className,
 }: {
@@ -102,115 +39,15 @@ export function FadeSwap({
   children: ReactNode;
   className?: string;
 }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
-
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={id}
-        className={className}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.3, ease: EASE_OUT_EXPO }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
+  return <div className={className}>{children}</div>;
 }
 
-/**
- * A number that eases toward its target instead of snapping — for stat
- * tiles where the underlying value can change (a new expense lands, a
- * settlement confirms). Renders the plain final value with no animation
- * for reduced-motion users.
- */
-export function AnimatedNumber({
-  value,
-  decimals = 0,
-}: {
-  value: number;
-  decimals?: number;
-}) {
-  const reduce = useReducedMotion();
-  const spring = useSpring(value, { stiffness: 140, damping: 22, mass: 0.6 });
-  const [display, setDisplay] = useState(value);
-
-  useEffect(() => {
-    if (!reduce) spring.set(value);
-  }, [value, reduce, spring]);
-
-  useEffect(() => {
-    if (reduce) return;
-    return spring.on("change", setDisplay);
-  }, [reduce, spring]);
-
-  return <>{(reduce ? value : display).toFixed(decimals)}</>;
+/** Renders the plain formatted number — no count-up. */
+export function AnimatedNumber({ value, decimals = 0 }: { value: number; decimals?: number }) {
+  return <>{value.toFixed(decimals)}</>;
 }
 
-/**
- * Fades + slides in the current route's content, keyed by pathname, so
- * navigating between pages never feels like a hard cut. Lives inside the
- * app shell's <main> rather than the root layout, so the sidebar/header
- * never re-mount — only the page content transitions.
- */
-export function PageTransition({
-  routeKey,
-  children,
-}: {
-  routeKey: string;
-  children: ReactNode;
-}) {
-  const reduce = useReducedMotion();
-  if (reduce) return <>{children}</>;
-
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={routeKey}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.25, ease: EASE_OUT_EXPO }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-/** Springy press/hover affordance for anything clickable — buttons, nav items, cards. */
-export function Pressable({
-  children,
-  className,
-  onClick,
-  hoverY = -3,
-}: {
-  children: ReactNode;
-  className?: string;
-  onClick?: () => void;
-  hoverY?: number;
-}) {
-  const reduce = useReducedMotion();
-  if (reduce) {
-    return (
-      <div className={className} onClick={onClick}>
-        {children}
-      </div>
-    );
-  }
-
-  return (
-    <motion.div
-      className={className}
-      onClick={onClick}
-      whileHover={{ y: hoverY, scale: 1.01 }}
-      whileTap={{ scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 400, damping: 28 }}
-    >
-      {children}
-    </motion.div>
-  );
+/** Renders the current route's content directly — no transition, no forced remount on navigation. */
+export function PageTransition({ children }: { routeKey: string; children: ReactNode }) {
+  return <>{children}</>;
 }

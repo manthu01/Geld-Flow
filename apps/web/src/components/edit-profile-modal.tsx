@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { motion, useReducedMotion } from "motion/react";
 import { GlassCard } from "@/components/glass-card";
 import { useAuth } from "@/lib/auth-context";
 import { updateProfile } from "@/lib/api";
@@ -19,7 +18,6 @@ const USERNAME_COOLDOWN_DAYS = 14;
 
 export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const { user, authFetch, updateUser } = useAuth();
-  const reduce = useReducedMotion();
 
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
@@ -53,21 +51,13 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
   }
 
   return createPortal(
-    <motion.div
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
       onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: reduce ? 0 : 0.18 }}
     >
       <GlassCard
         className="w-full max-w-sm space-y-4 p-6"
         onClick={(e) => e.stopPropagation()}
-        initial={reduce ? false : { opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={reduce ? undefined : { opacity: 0, scale: 0.96, y: 8 }}
-        transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
       >
         <h2 className="font-display text-lg font-semibold text-ink">Edit profile</h2>
 
@@ -160,7 +150,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </GlassCard>
-    </motion.div>,
+    </div>,
     document.body,
   );
 }
