@@ -27,7 +27,7 @@ interface TelegramMessage {
   chat: TelegramChat;
   text?: string;
 }
-interface TelegramUpdate {
+export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
 }
@@ -73,6 +73,23 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // Render's free tier spins the whole process down after ~15 minutes
+    // without inbound HTTP traffic, which would silently kill a
+    // long-running poll loop. A webhook instead sits idle until Telegram
+    // calls it, and that inbound request is itself what wakes a sleeping
+    // free instance — so prefer it whenever there's a public URL to give
+    // Telegram. Local dev has no such URL, so it falls back to polling.
+    const apiBaseUrl = this.config.get<string>('API_BASE_URL');
+    if (apiBaseUrl) {
+      await this.callApi('setWebhook', {
+        url: `${apiBaseUrl}/telegram/webhook/${this.token}`,
+      });
+      this.logger.log(
+        `Telegram bot @${this.botUsername} is listening via webhook.`,
+      );
+      return;
+    }
+
     this.polling = true;
     void this.pollLoop();
     this.logger.log(
@@ -82,6 +99,21 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy(): void {
     this.polling = false;
+  }
+
+  /**
+   * Entry point for the webhook controller. The bot token doubles as the
+   * URL secret — only whoever holds it (us, and Telegram once we've
+   * registered the webhook) can hit this path meaningfully.
+   */
+  async handleWebhookUpdate(
+    token: string,
+    update: TelegramUpdate,
+  ): Promise<void> {
+    if (!this.token || token !== this.token) return;
+    if (update.message) {
+      await this.handleMessage(update.message);
+    }
   }
 
   async generateLinkCode(ledgerId: string, userId: string) {
