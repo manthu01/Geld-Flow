@@ -55,10 +55,16 @@ export class AuthController {
   }
 
   private refreshCookieOptions(maxAge: number): CookieOptions {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     return {
       httpOnly: true,
-      secure: this.config.get<string>('NODE_ENV') === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      // The web app and API live on different sites in production
+      // (vercel.app vs onrender.com), so a `lax` cookie never gets sent on
+      // the cross-origin refresh fetch — only `none` (which requires
+      // `secure`) works there. Locally both run on localhost, where `lax`
+      // is fine and doesn't require HTTPS.
+      sameSite: isProduction ? 'none' : 'lax',
       path: REFRESH_COOKIE_PATH,
       maxAge,
     };
