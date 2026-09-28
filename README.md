@@ -6,7 +6,7 @@ An expense-splitting platform for groups and pairs — IOU ledger, live activity
 
 All planned phases are built:
 
-- **Phase 0** — monorepo foundation, auth (plain email login + Google OAuth)
+- **Phase 0** — monorepo foundation, auth (email + password, plus Google OAuth), admin panel
 - **Phase 1** — core engine: ledgers, expenses (equal/percentage/exact splits), balances, settlements, activity feed
 - **Phase 2** — reputation/rank system, debt-simplification for groups
 - **Phase 3** — Telegram bot, contextual Travel/Event dashboards
@@ -37,7 +37,7 @@ pnpm dev:api                  # http://localhost:4000
 pnpm dev:web                  # http://localhost:3000
 ```
 
-Copy `apps/api/.env.example` to `apps/api/.env` before starting the API. Signing in only ever needs an email address — no password, no verification email to configure.
+Copy `apps/api/.env.example` to `apps/api/.env` before starting the API. Sign-in is email + password — no separate sign-up, an unrecognized email just creates the account on the spot.
 
 ### Running checks
 
@@ -63,10 +63,11 @@ All live in `apps/api/.env` (see `apps/api/.env.example` for the template). Ever
 | `JWT_ACCESS_SECRET` | ✅ | Signs access tokens — must be at least 16 characters |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALLBACK_URL` | | Google OAuth. Without these, Google sign-in returns a 503 instead of crashing the app |
 | `TELEGRAM_BOT_TOKEN` | | Telegram bot. Without it, the bot module stays gracefully disabled — `/telegram/status` reports `configured: false` and the frontend hides the connect flow |
+| `ADMIN_EMAIL` | | Whoever's logged in with this email sees the admin panel (`/admin`). Without it, every `/admin/*` route returns 503 |
 
 Missing `DATABASE_URL` or a too-short `JWT_ACCESS_SECRET` fails startup immediately with a clear error, rather than the app booting and failing confusingly on the first request that needs them.
 
-`apps/web` reads `NEXT_PUBLIC_API_URL` (see `apps/web/.env.local`), defaulting to `http://localhost:4000`.
+`apps/web` reads `NEXT_PUBLIC_API_URL` (see `apps/web/.env.local`), defaulting to `http://localhost:4000`. It also reads `NEXT_PUBLIC_ADMIN_EMAIL` to decide whether to show the (unhidden-by-obscurity — the API's `ADMIN_EMAIL` is the actual gate) admin link in the sidebar.
 
 ## Design principles
 
@@ -79,10 +80,11 @@ Missing `DATABASE_URL` or a too-short `JWT_ACCESS_SECRET` fails startup immediat
 
 ## Architecture notes
 
-- **Auth**: sign in with just an email address (no password, no verification link — the account is created on first use) or Google OAuth, both issuing a short-lived JWT access token plus a rotating httpOnly refresh cookie. Refresh rotation is atomic (`UPDATE ... WHERE revoked_at IS NULL`) to survive concurrent refresh attempts safely.
+- **Auth**: email + password (bcrypt, `bcryptjs` — pure JS, no native build step to break a deploy) or Google OAuth, both issuing a short-lived JWT access token plus a rotating httpOnly refresh cookie. An email with no account yet doubles as sign-up on the same endpoint. Refresh rotation is atomic (`UPDATE ... WHERE revoked_at IS NULL`) to survive concurrent refresh attempts safely.
+- **Admin panel**: a single hardcoded admin (`ADMIN_EMAIL`) — real security is the `AdminGuard` on every `/admin/*` route, not the sidebar link being easy to miss. Read-only usage/analytics stats plus a user list with an admin-triggered password reset (never displays or requires the old password).
 - **Splits**: `equal` / `percentage` / `exact`, computed server-side in integer cents so shares always sum exactly to the total — no float drift, remainder cents distributed deterministically.
 - **Debt simplification**: a pure, DB-free util (`simplifyDebts`) doing greedy largest-creditor/largest-debtor matching — at most n-1 transfers for n participants. Groups only; a personal ledger is already just two people.
-- **Telegram bot**: long-polls Telegram's `getUpdates` (no public webhook needed for local dev). One chat maps to one ledger via a short-lived link code generated from that ledger's page. Expense messages ("Paid $40 for pizza @Alex") are parsed and matched to members by pure, unit-tested utilities — an ambiguous or unmatched name is never guessed at.
+- **Telegram bot**: long-polls Telegram's `getUpdates` (no public webhook needed for local dev). One chat maps to one ledger via a short-lived link code generated from that ledger's page. Expense messages ("Paid 40 for pizza @Alex") are parsed and matched to members by pure, unit-tested utilities — an ambiguous or unmatched name is never guessed at.
 - **Badges**: eight badge definitions sync into the database on every boot (idempotent upsert-by-key — no seed script to remember to run). Awards are idempotent and checked directly inside the services that already know when criteria are met.
 
 ## Security

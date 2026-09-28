@@ -29,6 +29,31 @@ export class ReputationService {
   }
 
   /**
+   * One query for every member of a ledger, instead of the ledger page
+   * firing one /reputation/:userId request per member — that was an
+   * extra full network round-trip per person on top of everything else
+   * the page already waits on.
+   */
+  async getScores(userIds: string[]): Promise<Record<string, ScoreView>> {
+    const rows = await prisma.userScore.findMany({
+      where: { userId: { in: userIds } },
+    });
+    const byUserId = new Map(rows.map((row) => [row.userId, row]));
+
+    const result: Record<string, ScoreView> = {};
+    for (const userId of userIds) {
+      result[userId] = byUserId.get(userId) ?? {
+        userId,
+        currentRank: 'I',
+        rollingAvgSettleHours: null,
+        confirmedSettlements: 0,
+        updatedAt: null,
+      };
+    }
+    return result;
+  }
+
+  /**
    * Called from inside a settlement's own confirm transaction so a score
    * update never happens without the settlement that earned it actually
    * landing. `hours` is measured from when the payer recorded the

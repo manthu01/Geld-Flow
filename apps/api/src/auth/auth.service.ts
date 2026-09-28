@@ -7,8 +7,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 import { prisma, type User } from '@geld-flow/db';
 import type { UpdateProfileInput } from '@geld-flow/shared';
+
+const BCRYPT_ROUNDS = 12;
 
 export const REFRESH_COOKIE_NAME = 'refresh_token';
 export const REFRESH_COOKIE_PATH = '/auth';
@@ -68,23 +71,56 @@ export class AuthService {
 
   // ------------------------------------------------------------- Email
 
-  /**
-   * Signing in is just "type your email" — no password, no verification
-   * link. Finds the matching account or creates one on first use, so
-   * every unique email maps to exactly one auto-named, auto-usernamed
-   * user.
-   */
-  async findOrCreateByEmail(email: string): Promise<User> {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) return existing;
+  /** Lets the login form ask before it asks: does this email already have an account? */
+  async emailExists(email: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    return user !== null;
+  }
 
-    const localPart = email.split('@')[0] ?? 'user';
-    return prisma.user.create({
-      data: {
-        email,
-        name: localPart,
-        username: await generateUniqueUsername(localPart),
-      },
+  /**
+   * Email + password, like any other site. An email with no account yet
+   * doubles as signup — no separate sign-up step — but an *existing*
+   * account with no password set (e.g. Google-only so far) can't be
+   * logged into this way; it needs a password set first, either by the
+   * user going through Google once, or by an admin.
+   */
+  async loginOrSignUp(email: string, password: string): Promise<User> {
+    const existing = await prisma.user.findUnique({ where: { email } });
+
+    if (!existing) {
+      const localPart = email.split('@')[0] ?? 'user';
+      return prisma.user.create({
+        data: {
+          email,
+          name: localPart,
+          username: await generateUniqueUsername(localPart),
+          passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS),
+        },
+      });
+    }
+
+    if (!existing.passwordHash) {
+      throw new UnauthorizedException(
+        'This account has no password set yet. Sign in with Google, or ask an admin to set one.',
+      );
+    }
+
+    const valid = await bcrypt.compare(password, existing.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect password.');
+    }
+
+    return existing;
+  }
+
+  /** Admin-only: sets (or replaces) a user's password without ever needing to know the old one. */
+  async adminSetPassword(userId: string, newPassword: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(newPassword, BCRYPT_ROUNDS) },
     });
   }
 

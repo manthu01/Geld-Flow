@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import type { User } from '@geld-flow/db';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -12,6 +12,18 @@ export class ReputationController {
   @Get('me')
   me(@CurrentUser() user: User) {
     return this.reputation.getScore(user.id);
+  }
+
+  // Declared before ':userId' — Nest matches routes in order, and a
+  // literal segment has to win over the param route or "batch" would be
+  // parsed as a userId.
+  @Get('batch')
+  batch(@Query('userIds') userIds: string) {
+    const ids = (userIds ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    return this.reputation.getScores(ids);
   }
 
   @Get(':userId')

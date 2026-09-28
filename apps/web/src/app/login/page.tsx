@@ -2,10 +2,9 @@
 
 import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { API_URL, login } from "@/lib/api";
+import { API_URL, checkEmailExists, login } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { GlassCard } from "@/components/glass-card";
-import { Reveal } from "@/components/motion-primitives";
 
 function LoginError() {
   const params = useSearchParams();
@@ -47,19 +46,48 @@ function GoogleLogo() {
   );
 }
 
+type Step = "email" | "password";
+
 export default function LoginPage() {
   const router = useRouter();
   const { completeLogin } = useAuth();
+
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
+  const [exists, setExists] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function handleSubmit(event: FormEvent) {
+  async function handleEmailSubmit(event: FormEvent) {
     event.preventDefault();
     setStatus("loading");
     setErrorMessage(null);
     try {
-      const result = await login(email);
+      const found = await checkEmailExists(email);
+      setExists(found);
+      setStep("password");
+      setStatus("idle");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Something went wrong.");
+      setStatus("error");
+    }
+  }
+
+  async function handlePasswordSubmit(event: FormEvent) {
+    event.preventDefault();
+    setErrorMessage(null);
+
+    if (!exists && password !== confirmPassword) {
+      setErrorMessage("Those passwords don't match.");
+      setStatus("error");
+      return;
+    }
+
+    setStatus("loading");
+    try {
+      const result = await login(email, password);
       completeLogin(result);
       router.replace("/");
     } catch (error) {
@@ -70,7 +98,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
-      <Reveal className="w-full max-w-sm space-y-6">
+      <div className="animate-fade-in-up w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <div className="flex justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
@@ -80,7 +108,7 @@ export default function LoginPage() {
             Sign in to Geld Flow
           </h1>
           <p className="text-sm text-ink-soft">
-            No password, no verification email — just your address.
+            {step === "email" ? "Enter your email to continue." : exists ? "Welcome back." : "Choose a password to create your account."}
           </p>
         </div>
 
@@ -89,50 +117,111 @@ export default function LoginPage() {
         </Suspense>
 
         <GlassCard className="overflow-hidden p-6">
-          <div className="space-y-5">
-            <form onSubmit={handleSubmit} className="space-y-3">
+          {step === "email" ? (
+            <div className="space-y-5">
+              <form onSubmit={handleEmailSubmit} className="space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs uppercase tracking-wide text-ink-soft">
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </label>
+                {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
+                <button
+                  type="submit"
+                  disabled={status === "loading"}
+                  className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
+                >
+                  {status === "loading" ? "Checking…" : "Continue"}
+                </button>
+              </form>
+
+              <div className="flex items-center gap-3 text-xs text-ink-soft">
+                <span className="h-px flex-1 bg-surface-border" />
+                or
+                <span className="h-px flex-1 bg-surface-border" />
+              </div>
+
+              <a
+                href={`${API_URL}/auth/google`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
+              >
+                <GoogleLogo />
+                Continue with Google
+              </a>
+            </div>
+          ) : (
+            <form onSubmit={handlePasswordSubmit} className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setPassword("");
+                  setConfirmPassword("");
+                  setErrorMessage(null);
+                }}
+                className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink"
+              >
+                {email} — use a different email
+              </button>
+
               <label className="block space-y-1.5">
                 <span className="text-xs uppercase tracking-wide text-ink-soft">
-                  Email
+                  Password
                 </span>
                 <input
-                  type="email"
+                  type="password"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  autoFocus
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
                   className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </label>
+
+              {!exists && (
+                <label className="block space-y-1.5">
+                  <span className="text-xs uppercase tracking-wide text-ink-soft">
+                    Confirm password
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </label>
+              )}
+
               {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
               <button
                 type="submit"
                 disabled={status === "loading"}
                 className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
               >
-                {status === "loading" ? "Signing in…" : "Continue"}
+                {status === "loading"
+                  ? "Please wait…"
+                  : exists
+                    ? "Sign in"
+                    : "Create account"}
               </button>
-              <p className="text-center text-xs text-ink-soft">
-                First time? This creates your account — no separate sign-up.
-              </p>
             </form>
-
-            <div className="flex items-center gap-3 text-xs text-ink-soft">
-              <span className="h-px flex-1 bg-surface-border" />
-              or
-              <span className="h-px flex-1 bg-surface-border" />
-            </div>
-
-            <a
-              href={`${API_URL}/auth/google`}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
-            >
-              <GoogleLogo />
-              Continue with Google
-            </a>
-          </div>
+          )}
         </GlassCard>
-      </Reveal>
+      </div>
     </main>
   );
 }

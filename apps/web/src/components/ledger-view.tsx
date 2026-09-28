@@ -21,7 +21,7 @@ import {
   getBalances,
   getDebtSimplification,
   getLedgerDetail,
-  getUserScore,
+  getScoresBatch,
   listActivity,
   listExpenses,
   listSettlements,
@@ -78,20 +78,23 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
       setActivity(activityData.items);
       setSettlements(settlementData);
 
-      const scoreEntries = await Promise.all(
-        ledgerData.members.map(
-          async (m) => [m.userId, await getUserScore(authFetch, m.userId)] as const,
+      // Both of these only depend on the first batch's results (member
+      // ids, ledger type), not on each other — running them together
+      // instead of one after the other saves a full round-trip off
+      // every ledger page load.
+      const [scores, suggestions] = await Promise.all([
+        getScoresBatch(
+          authFetch,
+          ledgerData.members.map((m) => m.userId),
         ),
-      );
-      setScores(Object.fromEntries(scoreEntries));
-
-      // Simplification is only meaningful for 3+ people — a personal
-      // ledger is already just the two of you.
-      setDebtSuggestions(
+        // Simplification is only meaningful for 3+ people — a personal
+        // ledger is already just the two of you.
         ledgerData.type === "personal"
-          ? []
-          : await getDebtSimplification(authFetch, ledgerId),
-      );
+          ? Promise.resolve([])
+          : getDebtSimplification(authFetch, ledgerId),
+      ]);
+      setScores(scores);
+      setDebtSuggestions(suggestions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load this ledger.");
     } finally {
@@ -206,7 +209,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
             {expenses.length === 0 && settlements.length === 0 && (
               <button
                 onClick={handleDeleteLedger}
-                className="text-xs text-owes underline underline-offset-2 hover:text-owes/80"
+                className="rounded-lg border border-owes/30 bg-owes/10 px-3 py-1.5 text-xs font-medium text-owes transition-colors hover:bg-owes/20"
               >
                 Delete ledger
               </button>
@@ -302,19 +305,19 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                             {e.amount} {e.currency}
                           </span>
                           {canEdit && (
-                            <div className="flex gap-2 text-xs">
+                            <div className="flex gap-1.5 text-xs">
                               <button
                                 onClick={() => {
                                   setEditingExpense(e);
                                   setShowAddExpense(false);
                                 }}
-                                className="text-accent-strong underline underline-offset-2"
+                                className="rounded-md border border-surface-border px-2 py-1 font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDelete(e)}
-                                className="text-owes underline underline-offset-2"
+                                className="rounded-md border border-owes/30 bg-owes/10 px-2 py-1 font-medium text-owes transition-colors hover:bg-owes/20"
                               >
                                 Delete
                               </button>
@@ -385,7 +388,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                           setSettleTarget(b.userId);
                           setSettleAmountHint("");
                         }}
-                        className="text-xs text-accent-strong underline underline-offset-2"
+                        className="rounded-lg bg-accent-tint px-2.5 py-1 text-xs font-medium text-accent-strong transition-colors hover:bg-accent/20"
                       >
                         Settle up
                       </button>
@@ -424,7 +427,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                           setSettleTarget(t.toUserId);
                           setSettleAmountHint(String(t.amount));
                         }}
-                        className="text-xs text-accent-strong underline underline-offset-2"
+                        className="rounded-lg bg-accent-tint px-2.5 py-1 text-xs font-medium text-accent-strong transition-colors hover:bg-accent/20"
                       >
                         Settle this
                       </button>

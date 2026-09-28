@@ -13,8 +13,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
+  checkEmailSchema,
   loginSchema,
   updateProfileSchema,
+  type CheckEmailInput,
   type LoginInput,
   type UpdateProfileInput,
 } from '@geld-flow/shared';
@@ -76,10 +78,19 @@ export class AuthController {
 
   // -------------------------------------------------------------- Login
 
+  /** Lets the login form know whether to show "sign in" or "create account" copy before the person commits to a password. */
+  @Post('check-email')
+  @Throttle({ default: { limit: 30, ttl: 900_000 } })
+  async checkEmail(
+    @Body(new ZodValidationPipe(checkEmailSchema)) body: CheckEmailInput,
+  ) {
+    return { exists: await this.authService.emailExists(body.email) };
+  }
+
   /**
-   * No password, no verification link — an email is the whole account.
-   * First sign-in creates the account (with an auto-generated username);
-   * every sign-in after that just logs the same account back in.
+   * Email + password, like any other site. An email with no account yet
+   * doubles as signup (with an auto-generated username) — no separate
+   * sign-up step.
    */
   @Post('login')
   @Throttle({ default: { limit: 20, ttl: 900_000 } })
@@ -87,7 +98,10 @@ export class AuthController {
     @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const user = await this.authService.findOrCreateByEmail(body.email);
+    const user = await this.authService.loginOrSignUp(
+      body.email,
+      body.password,
+    );
     const tokens = await this.authService.issueTokens(user.id, user.email);
     this.setRefreshCookie(
       res,

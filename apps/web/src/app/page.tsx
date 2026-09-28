@@ -16,9 +16,14 @@ export default function Home() {
     );
   }
 
+  // Render the signed-out view immediately for "loading" too — the session
+  // check happens in the background, and there's nothing worth blocking on
+  // here. Whoever's actually logged in gets swapped to the dashboard the
+  // moment that resolves; everyone else was never made to wait on a
+  // "checking session" message just to see a sign-in prompt.
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
-      <div className="w-full max-w-md space-y-2 text-center">
+      <div className="animate-fade-in-up w-full max-w-md space-y-4 text-center">
         <div className="flex justify-center pb-1">
           {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
           <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-16 w-16 rounded-2xl" />
@@ -29,17 +34,12 @@ export default function Home() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">
           Split expenses, not friendships.
         </h1>
-        {status === "loading" && (
-          <p className="text-sm text-ink-soft">Checking your session…</p>
-        )}
-        {status === "unauthenticated" && (
-          <p className="text-sm text-ink-soft">
-            <Link href="/login" className="text-accent-strong underline underline-offset-2">
-              Sign in
-            </Link>{" "}
-            to see your ledgers.
-          </p>
-        )}
+        <Link
+          href="/login"
+          className="inline-block rounded-lg bg-accent px-6 py-2.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-strong"
+        >
+          Sign in
+        </Link>
       </div>
     </main>
   );

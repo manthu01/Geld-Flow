@@ -21,6 +21,9 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  // Whoever's JWT carries this email gets the admin panel. Unset means no
+  // admin panel at all — never guess this from data, always come from config.
+  ADMIN_EMAIL: z.string().email().optional(),
 });
 
 export function validateEnv(

@@ -1,15 +1,29 @@
 import { z } from "zod";
 
 /**
- * Auth. Shared so the login form and the API validate email addresses
- * with the exact same rule. Signing in is intentionally just "type your
- * email" — no password, no verification link — with an account
- * auto-created on first use.
+ * Auth. Shared so the login form and the API validate the same way.
+ * Email + password, like any other site — checkEmailSchema powers the
+ * first step (does this email already have an account, so the form
+ * knows whether to ask for a new password or an existing one), and
+ * loginSchema powers the second step, which doubles as signup on an
+ * email that doesn't exist yet.
  */
+const emailField = z.string().trim().toLowerCase().email();
+const passwordField = z.string().min(8, "Password must be at least 8 characters.");
+
+export const checkEmailSchema = z.object({ email: emailField });
+export type CheckEmailInput = z.infer<typeof checkEmailSchema>;
+
 export const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
+  email: emailField,
+  password: passwordField,
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const adminSetPasswordSchema = z.object({
+  newPassword: passwordField,
+});
+export type AdminSetPasswordInput = z.infer<typeof adminSetPasswordSchema>;
 
 // Username is a separate, unique handle from the display `name` — every
 // account gets one auto-generated at signup, editable any time after.

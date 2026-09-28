@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { EditProfileModal } from "@/components/edit-profile-modal";
+import { GlassCard } from "@/components/glass-card";
 import { useAuth } from "@/lib/auth-context";
 import { getMyScore, listMyLedgers, type LedgerSummary, type ScoreView } from "@/lib/api";
 
@@ -31,9 +32,22 @@ function NavLink({ href, label, onNavigate }: { href: string; label: string; onN
   );
 }
 
-function NavLedgerLink({ ledger, onNavigate }: { ledger: LedgerSummary; onNavigate: () => void }) {
+function NavLedgerLink({
+  ledger,
+  currentUserId,
+  onNavigate,
+}: {
+  ledger: LedgerSummary;
+  currentUserId: string | undefined;
+  onNavigate: () => void;
+}) {
   const pathname = usePathname();
   const active = pathname === `/ledgers/${ledger.id}`;
+  // Personal ledgers never have a `name` (they're a pairing between two
+  // people, not something you title) — the useful label is the other
+  // person's name, same as the dashboard's own ledger cards already do.
+  const peer = ledger.members.find((m) => m.userId !== currentUserId);
+  const label = ledger.name ?? peer?.user.name ?? "Personal ledger";
   return (
     <Link
       href={`/ledgers/${ledger.id}`}
@@ -44,13 +58,13 @@ function NavLedgerLink({ ledger, onNavigate }: { ledger: LedgerSummary; onNaviga
           : "text-ink-soft hover:bg-surface-strong hover:text-ink"
       }`}
     >
-      {ledger.name ?? "Personal ledger"}
+      {label}
     </Link>
   );
 }
 
 function useLedgerNav() {
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
   const [groups, setGroups] = useState<LedgerSummary[]>([]);
   const [personal, setPersonal] = useState<LedgerSummary[]>([]);
   const [score, setScore] = useState<ScoreView | null>(null);
@@ -76,11 +90,14 @@ function useLedgerNav() {
     void load();
   }, [load]);
 
-  return { groups, personal, score };
+  return { groups, personal, score, currentUserId: user?.id };
 }
 
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+
 function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
-  const { groups, personal } = useLedgerNav();
+  const { user } = useAuth();
+  const { groups, personal, currentUserId } = useLedgerNav();
 
   return (
     <div className="flex h-full flex-col">
@@ -106,7 +123,9 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
           {groups.length === 0 ? (
             <p className="px-3 text-xs text-ink-soft">None yet</p>
           ) : (
-            groups.map((g) => <NavLedgerLink key={g.id} ledger={g} onNavigate={onNavigate} />)
+            groups.map((g) => (
+              <NavLedgerLink key={g.id} ledger={g} currentUserId={currentUserId} onNavigate={onNavigate} />
+            ))
           )}
         </div>
 
@@ -117,10 +136,34 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
           {personal.length === 0 ? (
             <p className="px-3 text-xs text-ink-soft">None yet</p>
           ) : (
-            personal.map((p) => <NavLedgerLink key={p.id} ledger={p} onNavigate={onNavigate} />)
+            personal.map((p) => (
+              <NavLedgerLink key={p.id} ledger={p} currentUserId={currentUserId} onNavigate={onNavigate} />
+            ))
           )}
         </div>
       </nav>
+
+      {/* Not a security boundary — just avoids showing a link that would
+          403 for everyone else. The API's own ADMIN_EMAIL is what
+          actually gates /admin/*. */}
+      {ADMIN_EMAIL && user?.email === ADMIN_EMAIL && (
+        <Link
+          href="/admin"
+          onClick={onNavigate}
+          className="mt-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-ink-soft/50 hover:text-ink-soft"
+          title="Admin"
+        >
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M10 2 3 5v5c0 4.1 2.9 7.4 7 8 4.1-.6 7-3.9 7-8V5l-7-3Z"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Admin
+        </Link>
+      )}
     </div>
   );
 }
@@ -181,33 +224,59 @@ function ProfileMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-56 rounded-xl border border-surface-border bg-bg-elevated p-3 shadow-[var(--glass-shadow)]">
-          <p className="truncate px-1 text-sm font-medium text-ink">{user?.name}</p>
-          <p className="truncate px-1 font-mono text-xs text-accent-strong">@{user?.username}</p>
-          <p className="truncate px-1 text-xs text-ink-soft">{user?.email}</p>
-          {score && (
-            <p className="mt-1 px-1 font-mono text-xs text-ink-soft">
-              Rank {score.currentRank} · {score.confirmedSettlements} settled
-            </p>
-          )}
-          <div className="mt-3 space-y-0.5 border-t border-surface-border pt-2">
+        <GlassCard className="absolute right-0 top-11 z-50 w-64 overflow-hidden p-0 shadow-[var(--glass-shadow)]">
+          <div className="flex items-center gap-3 border-b border-surface-border bg-surface-strong/40 p-4">
+            <Avatar name={user?.name} avatarUrl={user?.avatarUrl} className="h-11 w-11 shrink-0 text-sm" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-ink">{user?.name}</p>
+              <p className="truncate font-mono text-xs text-accent-strong">@{user?.username}</p>
+            </div>
+          </div>
+
+          <div className="space-y-1 px-4 py-3 text-xs text-ink-soft">
+            <p className="truncate">{user?.email}</p>
+            {score && (
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-accent-tint px-2 py-0.5 font-mono text-accent-strong">
+                Rank {score.currentRank} · {score.confirmedSettlements} settled
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-0.5 border-t border-surface-border p-2">
             <button
               onClick={() => {
                 setEditing(true);
                 setOpen(false);
               }}
-              className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
+              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
             >
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true" className="shrink-0">
+                <path
+                  d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+              </svg>
               Edit profile
             </button>
             <button
               onClick={() => void logout()}
-              className="w-full rounded-lg px-1 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
+              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-ink-soft hover:bg-surface-strong hover:text-ink"
             >
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true" className="shrink-0">
+                <path
+                  d="M7.5 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17h3M13 13.5l3.5-3.5L13 6.5M16.25 10H8"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
               Sign out
             </button>
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {editing && <EditProfileModal onClose={() => setEditing(false)} />}

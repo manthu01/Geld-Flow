@@ -23,17 +23,30 @@ function readErrorMessage(data: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
+/** Lets the login form show "sign in" or "create account" copy before the person commits to a password. */
+export async function checkEmailExists(email: string): Promise<boolean> {
+  const res = await fetch(`${API_URL}/auth/check-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data: unknown = await res.json();
+  if (!res.ok) {
+    throw new Error(readErrorMessage(data));
+  }
+  return (data as { exists: boolean }).exists;
+}
+
 /**
- * The whole sign-in flow: no password, no verification link. Typing an
- * email logs you in — the account is created automatically the first
- * time a given email shows up.
+ * Email + password, like any other site. An email with no account yet
+ * doubles as signup — no separate sign-up step.
  */
-export async function login(email: string): Promise<RefreshResponse> {
+export async function login(email: string, password: string): Promise<RefreshResponse> {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, password }),
   });
   const data: unknown = await res.json();
   if (!res.ok) {
@@ -393,6 +406,16 @@ export async function getUserScore(
   return parseJson(await authFetch(`/reputation/${userId}`));
 }
 
+/** One request for a whole ledger's worth of member scores, instead of one request per member. */
+export async function getScoresBatch(
+  authFetch: AuthFetch,
+  userIds: string[],
+): Promise<Record<string, ScoreView>> {
+  if (userIds.length === 0) return {};
+  const params = new URLSearchParams({ userIds: userIds.join(",") });
+  return parseJson(await authFetch(`/reputation/batch?${params}`));
+}
+
 // ------------------------------------------------------ Debt simplification
 
 export interface SimplifiedTransfer {
@@ -502,4 +525,49 @@ export async function submitFeedback(
   message: string,
 ): Promise<{ id: string }> {
   return parseJson(await postJson(authFetch, "/feedback", { message }));
+}
+
+// --------------------------------------------------------------------- Admin
+
+export interface AdminStats {
+  userCount: number;
+  newUsersLast7Days: number;
+  personalLedgerCount: number;
+  groupLedgerCount: number;
+  expenseCount: number;
+  totalExpenseVolume: string;
+  settlementCount: number;
+  confirmedSettlementCount: number;
+}
+
+export interface AdminUserView {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  createdAt: string;
+  hasPassword: boolean;
+}
+
+export async function getAdminStats(authFetch: AuthFetch): Promise<AdminStats> {
+  return parseJson(await authFetch("/admin/stats"));
+}
+
+export async function listAdminUsers(authFetch: AuthFetch): Promise<AdminUserView[]> {
+  return parseJson(await authFetch("/admin/users"));
+}
+
+export async function setUserPassword(
+  authFetch: AuthFetch,
+  userId: string,
+  newPassword: string,
+): Promise<void> {
+  const res = await authFetch(`/admin/users/${userId}/password`, {
+    method: "PATCH",
+    body: JSON.stringify({ newPassword }),
+  });
+  if (!res.ok) {
+    const data: unknown = await res.json();
+    throw new Error(readErrorMessage(data));
+  }
 }

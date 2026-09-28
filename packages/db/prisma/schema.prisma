@@ -82,6 +82,10 @@ model User {
   usernameChangedAt DateTime? @map("username_changed_at")
   name      String
   avatarUrl String?  @map("avatar_url")
+  // Null for accounts that have only ever signed in via Google and never
+  // set a password, and for shadow (unclaimed) members. bcrypt hash only
+  // — never the raw password.
+  passwordHash String? @map("password_hash")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   // Shadow (unclaimed) member: created when an admin adds someone to a
