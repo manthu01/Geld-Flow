@@ -150,6 +150,23 @@ export async function listMyLedgers(
   return parseJson(await authFetch("/ledgers"));
 }
 
+export interface LedgerBrief {
+  id: string;
+  type: LedgerSummary["type"];
+  name: string | null;
+}
+
+export interface AnalysisSummary {
+  stats: { ledger: LedgerBrief; expenseCount: number }[];
+  feed: { event: ActivityEventView; ledger: LedgerBrief }[];
+}
+
+export async function getAnalysisSummary(
+  authFetch: AuthFetch,
+): Promise<AnalysisSummary> {
+  return parseJson(await authFetch("/ledgers/analysis-summary"));
+}
+
 export async function createGroupLedger(
   authFetch: AuthFetch,
   input: { type: "group_general" | "group_travel" | "group_event"; name?: string; baseCurrency: string },

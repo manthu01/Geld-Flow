@@ -104,6 +104,56 @@ export class LedgersService {
     return { groups, personal };
   }
 
+  /**
+   * The Analysis & History page's cross-ledger feed. Used to be built
+   * client-side with 2 requests per ledger (activity + expense count) on
+   * top of the ledger list itself — for someone in N ledgers, that's
+   * 1 + 2N round trips before the page could render. This collapses it
+   * to 3 queries total regardless of N.
+   */
+  async getAnalysisSummary(userId: string) {
+    const memberships = await prisma.ledgerMember.findMany({
+      where: { userId },
+      select: { ledger: { select: { id: true, name: true, type: true } } },
+      orderBy: { ledger: { createdAt: 'desc' } },
+    });
+    const ledgers = memberships.map((m) => m.ledger);
+    const ledgerIds = ledgers.map((l) => l.id);
+
+    if (ledgerIds.length === 0) {
+      return { stats: [], feed: [] };
+    }
+
+    const [activityEvents, expenseCounts] = await Promise.all([
+      prisma.activityEvent.findMany({
+        where: { ledgerId: { in: ledgerIds } },
+        include: {
+          actor: { select: { id: true, name: true, avatarUrl: true } },
+          ledger: { select: { id: true, name: true, type: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 40,
+      }),
+      prisma.expense.groupBy({
+        by: ['ledgerId'],
+        where: { ledgerId: { in: ledgerIds }, deletedAt: null },
+        _count: true,
+      }),
+    ]);
+
+    const countByLedger = new Map(
+      expenseCounts.map((c) => [c.ledgerId, c._count]),
+    );
+
+    return {
+      stats: ledgers.map((ledger) => ({
+        ledger,
+        expenseCount: countByLedger.get(ledger.id) ?? 0,
+      })),
+      feed: activityEvents.map(({ ledger, ...event }) => ({ event, ledger })),
+    };
+  }
+
   async getDetail(ledgerId: string, userId: string) {
     const membership = await this.access.assertMember(ledgerId, userId);
     const ledger = await prisma.ledger.findUnique({

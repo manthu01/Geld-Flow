@@ -9,20 +9,18 @@ import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitive
 import { useAuth } from "@/lib/auth-context";
 import { describeActivity, LEDGER_TYPE_LABELS } from "@/lib/activity";
 import {
-  listActivity,
-  listExpenses,
-  listMyLedgers,
+  getAnalysisSummary,
   type ActivityEventView,
-  type LedgerSummary,
+  type LedgerBrief,
 } from "@/lib/api";
 
 interface FeedEntry {
   event: ActivityEventView;
-  ledger: LedgerSummary;
+  ledger: LedgerBrief;
 }
 
 interface LedgerStat {
-  ledger: LedgerSummary;
+  ledger: LedgerBrief;
   expenseCount: number;
 }
 
@@ -38,34 +36,14 @@ export default function AnalysisPage() {
   // personal debt between the same two people must never mix. This page
   // only merges activity as a read-only log and counts expenses per
   // ledger; every dollar figure the app shows elsewhere stays scoped to
-  // its own ledger.
+  // its own ledger. The merge itself happens server-side now (one request
+  // regardless of how many ledgers you're in, instead of 1 + 2 per ledger).
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { groups, personal } = await listMyLedgers(authFetch);
-      const ledgers = [...groups, ...personal];
-
-      const perLedger = await Promise.all(
-        ledgers.map(async (ledger) => {
-          const [activity, expenses] = await Promise.all([
-            listActivity(authFetch, ledger.id, 1, 10),
-            listExpenses(authFetch, ledger.id, 1, 1),
-          ]);
-          return {
-            ledger,
-            entries: activity.items.map((event) => ({ event, ledger })),
-            expenseCount: expenses.total,
-          };
-        }),
-      );
-
-      const merged = perLedger
-        .flatMap((l) => l.entries)
-        .sort((a, b) => new Date(b.event.createdAt).getTime() - new Date(a.event.createdAt).getTime())
-        .slice(0, 40);
-
-      setFeed(merged);
-      setStats(perLedger.map((l) => ({ ledger: l.ledger, expenseCount: l.expenseCount })));
+      const { stats, feed } = await getAnalysisSummary(authFetch);
+      setStats(stats);
+      setFeed(feed);
     } finally {
       setLoading(false);
     }
