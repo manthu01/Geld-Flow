@@ -1,0 +1,16 @@
+name: Keep API warm
+
+on:
+  schedule:
+    # Every 10 minutes — comfortably under Render's free-tier ~15 minute
+    # idle spin-down. GitHub's scheduler can lag by a few minutes under
+    # load, so this reduces cold starts a lot but doesn't guarantee zero.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: curl -fsS --max-time 55 https://geld-flow-api.onrender.com/health
