@@ -9,11 +9,11 @@ import { useAuth } from "@/lib/auth-context";
 import { getMyScore, listMyLedgers, type LedgerSummary, type ScoreView } from "@/lib/api";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/personal", label: "Personal" },
   { href: "/groups", label: "Groups" },
-  { href: "/analysis", label: "Analysis & History" },
-  { href: "/about", label: "About" },
+  { href: "/friends", label: "Friends" },
+  { href: "/activity", label: "Activity" },
+  { href: "/", label: "Dashboard" },
+  { href: "/account", label: "Account" },
 ] as const;
 
 function NavLink({ href, label, onNavigate }: { href: string; label: string; onNavigate: () => void }) {
@@ -131,7 +131,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
 
         <div className="space-y-1.5">
           <p className="px-3 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-soft">
-            Personal
+            Friends
           </p>
           {personal.length === 0 ? (
             <p className="px-3 text-xs text-ink-soft">None yet</p>

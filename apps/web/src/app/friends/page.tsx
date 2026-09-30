@@ -10,7 +10,7 @@ import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitive
 import { useAuth } from "@/lib/auth-context";
 import { listMyLedgers, type LedgerSummary } from "@/lib/api";
 
-export default function PersonalPage() {
+export default function FriendsPage() {
   const { status, user, authFetch } = useAuth();
   const router = useRouter();
 
@@ -46,7 +46,7 @@ export default function PersonalPage() {
       <div className="w-full max-w-6xl space-y-6">
         <Reveal className="flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Personal</h1>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Friends</h1>
             <p className="text-sm text-ink-soft">One-on-one splits between you and a friend.</p>
           </div>
           <button

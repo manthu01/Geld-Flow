@@ -24,7 +24,7 @@ interface LedgerStat {
   expenseCount: number;
 }
 
-export default function AnalysisPage() {
+export default function ActivityPage() {
   const { status, authFetch } = useAuth();
   const router = useRouter();
 
@@ -66,7 +66,7 @@ export default function AnalysisPage() {
     <AppShell>
       <div className="w-full max-w-5xl space-y-8">
         <Reveal className="space-y-1">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Analysis & History</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Activity</h1>
           <p className="text-sm text-ink-soft">
             A combined activity log across every ledger you&rsquo;re in. Balances still never mix
             between ledgers — this is just a timeline.
