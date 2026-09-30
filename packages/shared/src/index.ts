@@ -29,6 +29,19 @@ export type AdminSetPasswordInput = z.infer<typeof adminSetPasswordSchema>;
 // account gets one auto-generated at signup, editable any time after.
 export const USERNAME_PATTERN = /^[a-z][a-z0-9_]{2,19}$/;
 
+// The five currencies the Account page's "Default currency" picker
+// offers — a display preference only, never a mutation of any expense's
+// actual recorded currency. See CurrencyDisplayPreference in web/lib.
+export const SUPPORTED_DISPLAY_CURRENCIES = [
+  "EUR",
+  "GBP",
+  "USD",
+  "INR",
+  "RUB",
+] as const;
+export type SupportedDisplayCurrency =
+  (typeof SUPPORTED_DISPLAY_CURRENCIES)[number];
+
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   username: z
@@ -41,8 +54,17 @@ export const updateProfileSchema = z.object({
     )
     .optional(),
   avatarUrl: z.string().trim().url().max(500).nullable().optional(),
+  email: emailField.optional(),
+  phoneNumber: z.string().trim().max(20).nullable().optional(),
+  defaultCurrency: z.enum(SUPPORTED_DISPLAY_CURRENCIES).optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Enter your current password."),
+  newPassword: passwordField,
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 /**
  * Enums mirrored from packages/db/prisma/schema.prisma.

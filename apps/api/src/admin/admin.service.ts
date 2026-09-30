@@ -18,9 +18,13 @@ export class AdminService {
       settlementCount,
       confirmedSettlementCount,
     ] = await Promise.all([
-      prisma.user.count({ where: { isShadow: false } }),
+      prisma.user.count({ where: { isShadow: false, deletedAt: null } }),
       prisma.user.count({
-        where: { isShadow: false, createdAt: { gte: sevenDaysAgo } },
+        where: {
+          isShadow: false,
+          deletedAt: null,
+          createdAt: { gte: sevenDaysAgo },
+        },
       }),
       prisma.ledger.count({ where: { type: 'personal' } }),
       prisma.ledger.count({
@@ -51,7 +55,7 @@ export class AdminService {
 
   async listUsers() {
     const users = await prisma.user.findMany({
-      where: { isShadow: false },
+      where: { isShadow: false, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

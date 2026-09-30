@@ -82,12 +82,25 @@ model User {
   usernameChangedAt DateTime? @map("username_changed_at")
   name      String
   avatarUrl String?  @map("avatar_url")
+  phoneNumber String? @map("phone_number")
+  // Display-only preference: converts amounts for viewing at a pinned
+  // rate. Never mutates a stored Expense's actual recorded currency —
+  // that stays whatever it was actually logged in, permanently.
+  defaultCurrency String @default("INR") @map("default_currency") @db.Char(3)
   // Null for accounts that have only ever signed in via Google and never
   // set a password, and for shadow (unclaimed) members. bcrypt hash only
   // — never the raw password.
   passwordHash String? @map("password_hash")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  // Set when the user deletes their own account while still having
+  // shared history with another real member somewhere (a group or
+  // personal ledger) — the row is redacted in place (synthetic email,
+  // no password, first name only) rather than removed, so that shared
+  // ledger's balances and audit trail survive for everyone else still in
+  // it. A fully solo account (no shared ledgers) is hard-deleted instead
+  // and never reaches this state. See AuthService.deleteOwnAccount.
+  deletedAt DateTime? @map("deleted_at")
   // Shadow (unclaimed) member: created when an admin adds someone to a
   // personal ledger by name only, with no account yet. Uses a synthetic,
   // unguessable placeholder email (never a real login target) so the

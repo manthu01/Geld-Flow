@@ -284,6 +284,17 @@ export class AuthService {
       }
     }
 
+    if (input.email !== undefined && input.email !== current.email) {
+      const taken = await prisma.user.findUnique({
+        where: { email: input.email },
+      });
+      if (taken && taken.id !== userId) {
+        throw new ConflictException(
+          'That email is already in use by another account.',
+        );
+      }
+    }
+
     return prisma.user.update({
       where: { id: userId },
       data: {
@@ -293,7 +304,126 @@ export class AuthService {
         ...(input.avatarUrl !== undefined
           ? { avatarUrl: input.avatarUrl }
           : {}),
+        ...(input.email !== undefined ? { email: input.email } : {}),
+        ...(input.phoneNumber !== undefined
+          ? { phoneNumber: input.phoneNumber }
+          : {}),
+        ...(input.defaultCurrency !== undefined
+          ? { defaultCurrency: input.defaultCurrency }
+          : {}),
       },
+    });
+  }
+
+  /** Self-service password change — requires the current password, unlike AdminService's reset. */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'This account has no password set yet. Sign in with Google, or ask an admin to set one.',
+      );
+    }
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Your current password is incorrect.');
+    }
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(newPassword, BCRYPT_ROUNDS) },
+    });
+  }
+
+  /**
+   * Deletes the caller's own account. A fully solo account (no ledger
+   * anywhere has another real member) is genuinely removed, cascading
+   * through its own ledgers. Otherwise the row is redacted in place —
+   * synthetic email, no password, first name only — so every ledger it's
+   * shared with keeps its balances and history intact for everyone else.
+   * Either way, every session is killed immediately.
+   */
+  async deleteOwnAccount(userId: string): Promise<void> {
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+    const memberships = await prisma.ledgerMember.findMany({
+      where: { userId },
+      select: {
+        ledgerId: true,
+        ledger: {
+          select: {
+            members: {
+              select: {
+                userId: true,
+                user: { select: { isShadow: true, deletedAt: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const hasSharedLedger = memberships.some((m) =>
+      m.ledger.members.some(
+        (member) =>
+          member.userId !== userId &&
+          !member.user.isShadow &&
+          !member.user.deletedAt,
+      ),
+    );
+
+    if (hasSharedLedger) {
+      const firstName = user.name.trim().split(/\s+/)[0] ?? user.name;
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: userId },
+          data: {
+            email: `deleted-${randomBytes(12).toString('hex')}@deleted.geldflow.internal`,
+            username: await generateUniqueUsername(
+              `deleted${randomBytes(4).toString('hex')}`,
+            ),
+            name: firstName,
+            avatarUrl: null,
+            phoneNumber: null,
+            passwordHash: null,
+            deletedAt: new Date(),
+          },
+        }),
+        prisma.refreshToken.deleteMany({ where: { userId } }),
+        prisma.authIdentity.deleteMany({ where: { userId } }),
+      ]);
+      return;
+    }
+
+    // No shared history anywhere — safe to remove everything for real.
+    const soloLedgerIds = memberships.map((m) => m.ledgerId);
+    await prisma.$transaction(async (tx) => {
+      for (const ledgerId of soloLedgerIds) {
+        const ledger = await tx.ledger.findUniqueOrThrow({
+          where: { id: ledgerId },
+          select: {
+            members: {
+              select: {
+                userId: true,
+                user: { select: { isShadow: true, addedByUserId: true } },
+              },
+            },
+          },
+        });
+        await tx.ledger.delete({ where: { id: ledgerId } });
+
+        const orphanedShadowIds = ledger.members
+          .filter((m) => m.user.isShadow && m.user.addedByUserId === userId)
+          .map((m) => m.userId);
+        if (orphanedShadowIds.length > 0) {
+          await tx.user.deleteMany({
+            where: { id: { in: orphanedShadowIds } },
+          });
+        }
+      }
+      await tx.user.delete({ where: { id: userId } });
     });
   }
 }

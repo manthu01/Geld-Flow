@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -13,9 +14,11 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
+  changePasswordSchema,
   checkEmailSchema,
   loginSchema,
   updateProfileSchema,
+  type ChangePasswordInput,
   type CheckEmailInput,
   type LoginInput,
   type UpdateProfileInput,
@@ -40,6 +43,9 @@ function toProfileView(user: User) {
     usernameChangedAt: user.usernameChangedAt,
     name: user.name,
     avatarUrl: user.avatarUrl,
+    phoneNumber: user.phoneNumber,
+    defaultCurrency: user.defaultCurrency,
+    hasPassword: user.passwordHash !== null,
   };
 }
 
@@ -191,5 +197,32 @@ export class AuthController {
   ) {
     const updated = await this.authService.updateProfile(user.id, body);
     return toProfileView(updated);
+  }
+
+  @Patch('password')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 900_000 } })
+  async changePassword(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(changePasswordSchema))
+    body: ChangePasswordInput,
+  ) {
+    await this.authService.changePassword(
+      user.id,
+      body.currentPassword,
+      body.newPassword,
+    );
+    return { message: 'Password updated.' };
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  async deleteMe(
+    @CurrentUser() user: User,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.deleteOwnAccount(user.id);
+    res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
+    return { message: 'Account deleted.' };
   }
 }

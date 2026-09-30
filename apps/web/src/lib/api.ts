@@ -7,6 +7,9 @@ export interface CurrentUser {
   usernameChangedAt: string | null;
   name: string;
   avatarUrl: string | null;
+  phoneNumber: string | null;
+  defaultCurrency: string;
+  hasPassword: boolean;
 }
 
 export interface RefreshResponse {
@@ -105,13 +108,37 @@ function postJson(authFetch: AuthFetch, path: string, body?: unknown) {
 
 export async function updateProfile(
   authFetch: AuthFetch,
-  input: { name?: string; username?: string; avatarUrl?: string | null },
+  input: {
+    name?: string;
+    username?: string;
+    avatarUrl?: string | null;
+    email?: string;
+    phoneNumber?: string | null;
+    defaultCurrency?: string;
+  },
 ): Promise<CurrentUser> {
   const res = await authFetch("/auth/me", {
     method: "PATCH",
     body: JSON.stringify(input),
   });
   return parseJson(res);
+}
+
+export async function changePassword(
+  authFetch: AuthFetch,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await parseJson(
+    await authFetch("/auth/password", {
+      method: "PATCH",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+  );
+}
+
+export async function deleteAccount(authFetch: AuthFetch): Promise<void> {
+  await parseJson(await authFetch("/auth/me", { method: "DELETE" }));
 }
 
 // ---------------------------------------------------------------- Ledgers

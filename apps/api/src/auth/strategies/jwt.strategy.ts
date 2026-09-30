@@ -22,7 +22,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   async validate(payload: AccessTokenPayload) {
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user) {
+    // deletedAt: an old still-valid access token from before the account
+    // was deleted shouldn't keep working for the rest of its ~15min TTL.
+    if (!user || user.deletedAt) {
       throw new UnauthorizedException();
     }
     return user;
