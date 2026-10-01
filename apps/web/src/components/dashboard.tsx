@@ -11,11 +11,14 @@ import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitive
 import { useLedgerNavData } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 import { createGroupLedger, redeemInvite } from "@/lib/api";
-import { PENDING_CLAIM_KEY } from "@/lib/claim";
+import { PENDING_CLAIM_KEY, PENDING_INVITE_KEY } from "@/lib/claim";
 
 function extractInviteToken(input: string): string {
   const trimmed = input.trim();
-  const match = trimmed.match(/\/invites\/([^/]+)\/redeem/);
+  // Matches both the current invite link shape (/invites/TOKEN) and the
+  // old one (/invites/TOKEN/redeem), so links someone saved before this
+  // changed still work when pasted here.
+  const match = trimmed.match(/\/invites\/([^/?#]+)/);
   return match ? match[1] : trimmed;
 }
 
@@ -33,14 +36,20 @@ export function Dashboard() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    // A claim link visited while signed out sends the person to /login
-    // with no way to return to it afterwards, so it stashes the token
-    // here first — the dashboard is where every sign-in flow lands, so
-    // this is where we pick it back up and finish the trip.
-    const pending = window.localStorage.getItem(PENDING_CLAIM_KEY);
-    if (pending) {
+    // A claim or invite link visited while signed out sends the person to
+    // /login with no way to return to it afterwards, so it stashes the
+    // token here first — the dashboard is where every sign-in flow lands,
+    // so this is where we pick it back up and finish the trip.
+    const pendingClaim = window.localStorage.getItem(PENDING_CLAIM_KEY);
+    if (pendingClaim) {
       window.localStorage.removeItem(PENDING_CLAIM_KEY);
-      router.replace(`/claim/${pending}`);
+      router.replace(`/claim/${pendingClaim}`);
+      return;
+    }
+    const pendingInvite = window.localStorage.getItem(PENDING_INVITE_KEY);
+    if (pendingInvite) {
+      window.localStorage.removeItem(PENDING_INVITE_KEY);
+      router.replace(`/invites/${pendingInvite}`);
     }
   }, [router]);
 

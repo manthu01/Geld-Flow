@@ -120,7 +120,7 @@ export class LedgersService {
     ledgerId: string,
     userId: string,
     input: CreateInviteInput,
-    apiBaseUrl: string,
+    webBaseUrl: string,
   ) {
     await this.access.assertRole(ledgerId, userId, ['owner', 'admin']);
 
@@ -135,7 +135,38 @@ export class LedgersService {
       },
     });
 
-    return { inviteUrl: `${apiBaseUrl}/invites/${rawToken}/redeem` };
+    // A link straight to the API (the old behaviour here) isn't a page a
+    // browser can do anything useful with — clicking it just GETs a JSON
+    // 401 from an endpoint that only accepts authenticated POSTs. This
+    // points at the web app instead, same as claimUrl below, which has a
+    // real page to sign in on and finish joining.
+    return { inviteUrl: `${webBaseUrl}/invites/${rawToken}` };
+  }
+
+  /** Public preview for the invite-landing page — never consumes a use. */
+  async getInviteInfo(rawToken: string) {
+    const invite = await prisma.invite.findUnique({
+      where: { tokenHash: hashToken(rawToken) },
+      include: {
+        ledger: { select: { name: true, type: true } },
+        createdBy: { select: { name: true } },
+      },
+    });
+    if (
+      !invite ||
+      invite.revokedAt ||
+      invite.expiresAt < new Date() ||
+      invite.useCount >= invite.maxUses
+    ) {
+      throw new NotFoundException(
+        'This invite link is invalid or has expired.',
+      );
+    }
+    return {
+      ledgerName: invite.ledger.name,
+      ledgerType: invite.ledger.type,
+      createdByName: invite.createdBy.name,
+    };
   }
 
   async redeemInvite(rawToken: string, userId: string) {

@@ -30,13 +30,6 @@ export class LedgersController {
     private readonly config: ConfigService,
   ) {}
 
-  private get apiBaseUrl(): string {
-    return (
-      this.config.get<string>('API_BASE_URL') ??
-      `http://localhost:${this.config.get<string>('PORT') ?? '4000'}`
-    );
-  }
-
   private get webBaseUrl(): string {
     return this.config.get<string>('WEB_APP_URL') ?? 'http://localhost:3000';
   }
@@ -83,6 +76,6 @@ export class LedgersController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createInviteSchema)) body: CreateInviteInput,
   ) {
-    return this.ledgers.createInvite(id, user.id, body, this.apiBaseUrl);
+    return this.ledgers.createInvite(id, user.id, body, this.webBaseUrl);
   }
 }

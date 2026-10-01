@@ -286,6 +286,17 @@ export async function createInvite(
   return parseJson(await postJson(authFetch, `/ledgers/${ledgerId}/invites`, {}));
 }
 
+export interface InviteInfo {
+  ledgerName: string | null;
+  ledgerType: LedgerSummary["type"];
+  createdByName: string;
+}
+
+export async function getInviteInfo(token: string): Promise<InviteInfo> {
+  const res = await fetch(`${API_URL}/invites/${token}`);
+  return parseJson(res);
+}
+
 export async function redeemInvite(
   authFetch: AuthFetch,
   token: string,

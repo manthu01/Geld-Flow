@@ -32,6 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${bricolage.variable} ${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-bg text-ink">
+        <div className="relative z-50 bg-amber-500/90 px-4 py-1.5 text-center text-xs font-medium text-amber-950">
+          🚧 Site under construction — actively being rebuilt right now, so a few things may be flaky. 🚧
+        </div>
         <AuroraBackground />
         <AuthProvider>{children}</AuthProvider>
       </body>
