@@ -183,6 +183,26 @@ export interface LedgerBrief {
   name: string | null;
 }
 
+export interface FriendLedgerBreakdown {
+  ledgerId: string;
+  ledgerName: string | null;
+  ledgerType: LedgerSummary["type"];
+  currency: string;
+  balance: number;
+}
+
+export interface FriendRelationship {
+  friend: { id: string; name: string; avatarUrl: string | null; isShadow: boolean };
+  breakdown: FriendLedgerBreakdown[];
+}
+
+/** Each person you share at least one ledger with, and your overall balance with them across every shared personal + group ledger. */
+export async function listFriends(
+  authFetch: AuthFetch,
+): Promise<FriendRelationship[]> {
+  return parseJson(await authFetch("/friends"));
+}
+
 export interface ActivityFeedEntry {
   event: ActivityEventView;
   ledger: LedgerBrief;
