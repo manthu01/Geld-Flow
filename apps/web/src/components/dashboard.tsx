@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { BadgeCase } from "@/components/badge-case";
 import { EmptyState } from "@/components/empty-state";
@@ -8,15 +8,9 @@ import { GlassCard } from "@/components/glass-card";
 import { LedgerCard } from "@/components/ledger-card";
 import { PersonalLedgerForm } from "@/components/personal-ledger-form";
 import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
+import { useLedgerNavData } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
-import {
-  createGroupLedger,
-  getMyScore,
-  listMyLedgers,
-  redeemInvite,
-  type LedgerSummary,
-  type ScoreView,
-} from "@/lib/api";
+import { createGroupLedger, redeemInvite } from "@/lib/api";
 import { PENDING_CLAIM_KEY } from "@/lib/claim";
 
 function extractInviteToken(input: string): string {
@@ -28,43 +22,15 @@ function extractInviteToken(input: string): string {
 export function Dashboard() {
   const { user, authFetch } = useAuth();
   const router = useRouter();
-
-  const [groups, setGroups] = useState<LedgerSummary[]>([]);
-  const [personal, setPersonal] = useState<LedgerSummary[]>([]);
-  const [score, setScore] = useState<ScoreView | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Shared with the sidebar/profile menu instead of re-fetching the same
+  // /ledgers + /reputation/me this page used to independently request.
+  const { groups, personal, score, loading, error } = useLedgerNavData();
 
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showPersonal, setShowPersonal] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [data, scoreData] = await Promise.all([
-        listMyLedgers(authFetch),
-        getMyScore(authFetch),
-      ]);
-      setGroups(data.groups);
-      setPersonal(data.personal);
-      setScore(scoreData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your ledgers.");
-    } finally {
-      setLoading(false);
-    }
-  }, [authFetch]);
-
-  useEffect(() => {
-    // Data fetch on mount, not a render-loop synchronization — the rule's
-    // false-positive case for this pattern (see auth-context.tsx history).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load]);
 
   useEffect(() => {
     // A claim link visited while signed out sends the person to /login

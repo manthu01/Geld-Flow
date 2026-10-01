@@ -2,18 +2,13 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, useLedgerNavData } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { GlassCard } from "@/components/glass-card";
 import { LedgerCard } from "@/components/ledger-card";
 import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
-import {
-  createGroupLedger,
-  getMyGroupBalances,
-  listMyLedgers,
-  type LedgerSummary,
-} from "@/lib/api";
+import { createGroupLedger, getMyGroupBalances } from "@/lib/api";
 
 const BALANCE_EPSILON = 0.005;
 type GroupFilter = "all" | "owe" | "owed";
@@ -25,48 +20,57 @@ const FILTERS: { value: GroupFilter; label: string }[] = [
 ];
 
 export default function GroupsPage() {
-  const { status, authFetch } = useAuth();
+  const { status } = useAuth();
   const router = useRouter();
 
-  const [groups, setGroups] = useState<LedgerSummary[]>([]);
+  useEffect(() => {
+    if (status === "unauthenticated") router.replace("/login");
+  }, [status, router]);
+
+  if (status !== "authenticated") return null;
+
+  return (
+    <AppShell>
+      <GroupsContent />
+    </AppShell>
+  );
+}
+
+function GroupsContent() {
+  const { authFetch } = useAuth();
+  const router = useRouter();
+  // Shared with the sidebar instead of re-fetching the same /ledgers this
+  // page used to independently request.
+  const { groups: ledgerGroups, loading: ledgersLoading } = useLedgerNavData();
+
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [filter, setFilter] = useState<GroupFilter>("all");
-  const [loading, setLoading] = useState(true);
+  const [balancesLoading, setBalancesLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const loadBalances = useCallback(async () => {
+    setBalancesLoading(true);
     try {
-      const [ledgers, myBalances] = await Promise.all([
-        listMyLedgers(authFetch),
-        getMyGroupBalances(authFetch),
-      ]);
-      setGroups(ledgers.groups);
-      setBalances(myBalances);
+      setBalances(await getMyGroupBalances(authFetch));
     } finally {
-      setLoading(false);
+      setBalancesLoading(false);
     }
   }, [authFetch]);
 
-  const visibleGroups = groups.filter((g) => {
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadBalances();
+  }, [loadBalances]);
+
+  const loading = ledgersLoading || balancesLoading;
+  const visibleGroups = ledgerGroups.filter((g) => {
     if (filter === "all") return true;
     const balance = balances[g.id] ?? 0;
     if (filter === "owe") return balance < -BALANCE_EPSILON;
     return balance > BALANCE_EPSILON;
   });
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace("/login");
-      return;
-    }
-    if (status === "authenticated") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      void load();
-    }
-  }, [status, router, load]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,10 +90,7 @@ export default function GroupsPage() {
     }
   }
 
-  if (status !== "authenticated") return null;
-
   return (
-    <AppShell>
       <div className="w-full max-w-6xl space-y-6">
         <Reveal className="flex items-center justify-between">
           <div className="space-y-1">
@@ -136,7 +137,7 @@ export default function GroupsPage() {
           </GlassCard>
         )}
 
-        {!loading && groups.length > 0 && (
+        {!loading && ledgerGroups.length > 0 && (
           <div className="flex gap-1.5">
             {FILTERS.map((f) => (
               <button
@@ -156,7 +157,7 @@ export default function GroupsPage() {
 
         {loading ? (
           <p className="text-sm text-ink-soft">Loading…</p>
-        ) : groups.length === 0 ? (
+        ) : ledgerGroups.length === 0 ? (
           <EmptyState title="No group ledgers yet" hint="Start a trip, event, or tab above." />
         ) : visibleGroups.length === 0 ? (
           <EmptyState title="No groups match that filter" />
@@ -170,6 +171,5 @@ export default function GroupsPage() {
           </StaggerGroup>
         )}
       </div>
-    </AppShell>
   );
 }

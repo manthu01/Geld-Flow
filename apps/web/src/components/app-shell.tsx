@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { EditProfileModal } from "@/components/edit-profile-modal";
@@ -68,8 +76,12 @@ function useLedgerNav() {
   const [groups, setGroups] = useState<LedgerSummary[]>([]);
   const [personal, setPersonal] = useState<LedgerSummary[]>([]);
   const [score, setScore] = useState<ScoreView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [ledgers, scoreData] = await Promise.all([
         listMyLedgers(authFetch),
@@ -78,8 +90,10 @@ function useLedgerNav() {
       setGroups(ledgers.groups);
       setPersonal(ledgers.personal);
       setScore(scoreData);
-    } catch {
-      // Sidebar/profile nav is a convenience, not core functionality — fail quiet.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load your ledgers.");
+    } finally {
+      setLoading(false);
     }
   }, [authFetch]);
 
@@ -90,14 +104,40 @@ function useLedgerNav() {
     void load();
   }, [load]);
 
-  return { groups, personal, score, currentUserId: user?.id };
+  return { groups, personal, score, loading, error, reload: load, currentUserId: user?.id };
+}
+
+type LedgerNavData = ReturnType<typeof useLedgerNav>;
+
+// Fetched once here and shared, instead of each consumer (the sidebar,
+// the profile menu, and the Dashboard all independently wanted this same
+// {groups, personal, score}) running its own copy of the fetch — that
+// used to mean /ledgers and /reputation/me each fired 2-3 times on a
+// single page load.
+const LedgerNavContext = createContext<LedgerNavData | null>(null);
+
+export function useLedgerNavData(): LedgerNavData {
+  const ctx = useContext(LedgerNavContext);
+  if (!ctx) {
+    throw new Error("useLedgerNavData must be used within AppShell");
+  }
+  return ctx;
 }
 
 const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
 
-function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
+function SidebarContent({
+  onNavigate,
+  groups,
+  personal,
+  currentUserId,
+}: {
+  onNavigate: () => void;
+  groups: LedgerSummary[];
+  personal: LedgerSummary[];
+  currentUserId: string | undefined;
+}) {
   const { user } = useAuth();
-  const { groups, personal, currentUserId } = useLedgerNav();
 
   return (
     <div className="flex h-full flex-col">
@@ -196,9 +236,8 @@ function Avatar({ name, avatarUrl, className }: { name: string | undefined; avat
   );
 }
 
-function ProfileMenu() {
+function ProfileMenu({ score }: { score: ScoreView | null }) {
   const { user, logout } = useAuth();
-  const { score } = useLedgerNav();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -286,12 +325,25 @@ function ProfileMenu() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Called once here instead of once per consumer — SidebarContent (x2,
+  // desktop + mobile drawer), ProfileMenu, and the Dashboard all used to
+  // each run their own copy of this hook, firing /ledgers and
+  // /reputation/me 2-3 times on a single page load. Shared via context
+  // below instead.
+  const ledgerNav = useLedgerNav();
+  const { groups, personal, score, currentUserId } = ledgerNav;
 
   return (
+    <LedgerNavContext.Provider value={ledgerNav}>
     <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-surface-border bg-surface/60 px-4 py-5 backdrop-blur-xl lg:flex">
-        <SidebarContent onNavigate={() => {}} />
+        <SidebarContent
+          onNavigate={() => {}}
+          groups={groups}
+          personal={personal}
+          currentUserId={currentUserId}
+        />
       </aside>
 
       {/* Mobile drawer */}
@@ -303,7 +355,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-hidden="true"
           />
           <aside className="absolute inset-y-0 left-0 w-72 border-r border-surface-border bg-bg-elevated px-4 py-5 shadow-2xl">
-            <SidebarContent onNavigate={() => setDrawerOpen(false)} />
+            <SidebarContent
+              onNavigate={() => setDrawerOpen(false)}
+              groups={groups}
+              personal={personal}
+              currentUserId={currentUserId}
+            />
           </aside>
         </div>
       )}
@@ -337,12 +394,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto">
-            <ProfileMenu />
+            <ProfileMenu score={score} />
           </div>
         </header>
 
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</main>
       </div>
     </div>
+    </LedgerNavContext.Provider>
   );
 }
