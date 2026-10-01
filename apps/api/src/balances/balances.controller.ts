@@ -14,3 +14,15 @@ export class BalancesController {
     return this.balances.getBalances(ledgerId, user.id);
   }
 }
+
+/** Powers the Groups page's All/You-owe/Owed-to-you filter — not nested under one ledger. */
+@Controller('balances')
+@UseGuards(JwtAuthGuard)
+export class MyBalancesController {
+  constructor(private readonly balances: BalancesService) {}
+
+  @Get('mine')
+  getMine(@CurrentUser() user: User) {
+    return this.balances.getMyGroupBalances(user.id);
+  }
+}

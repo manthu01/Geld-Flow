@@ -401,6 +401,13 @@ export async function getBalances(
   return parseJson(await authFetch(`/ledgers/${ledgerId}/balances`));
 }
 
+/** This user's own net balance in every group ledger — keyed by ledgerId — for the Groups page's filter. */
+export async function getMyGroupBalances(
+  authFetch: AuthFetch,
+): Promise<Record<string, number>> {
+  return parseJson(await authFetch("/balances/mine"));
+}
+
 // ------------------------------------------------------------ Settlements
 
 export interface SettlementView {

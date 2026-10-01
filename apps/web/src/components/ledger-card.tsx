@@ -10,14 +10,30 @@ export const GROUP_TYPE_LABELS: Record<string, string> = {
   group_event: "Event",
 };
 
+const BALANCE_EPSILON = 0.005;
+
+function BalanceLine({ balance, currency }: { balance: number; currency: string }) {
+  if (Math.abs(balance) < BALANCE_EPSILON) {
+    return <p className="mt-1 text-xs text-ink-soft">Settled up</p>;
+  }
+  const owed = balance > 0;
+  return (
+    <p className={`mt-1 text-xs font-medium ${owed ? "text-owed" : "text-owes"}`}>
+      {owed ? "Owed" : "You owe"} {currency} {Math.abs(balance).toFixed(2)}
+    </p>
+  );
+}
+
 export function LedgerCard({
   ledger,
   subtitle,
   pending,
+  balance,
 }: {
   ledger: LedgerSummary;
   subtitle: string;
   pending?: boolean;
+  balance?: number;
 }) {
   const router = useRouter();
   return (
@@ -47,6 +63,7 @@ export function LedgerCard({
           </span>
         )}
       </div>
+      {balance !== undefined && <BalanceLine balance={balance} currency={ledger.baseCurrency} />}
     </GlassCard>
   );
 }

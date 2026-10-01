@@ -8,13 +8,29 @@ import { GlassCard } from "@/components/glass-card";
 import { LedgerCard } from "@/components/ledger-card";
 import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
-import { createGroupLedger, listMyLedgers, type LedgerSummary } from "@/lib/api";
+import {
+  createGroupLedger,
+  getMyGroupBalances,
+  listMyLedgers,
+  type LedgerSummary,
+} from "@/lib/api";
+
+const BALANCE_EPSILON = 0.005;
+type GroupFilter = "all" | "owe" | "owed";
+
+const FILTERS: { value: GroupFilter; label: string }[] = [
+  { value: "all", label: "All groups" },
+  { value: "owe", label: "You owe" },
+  { value: "owed", label: "Owed to you" },
+];
 
 export default function GroupsPage() {
   const { status, authFetch } = useAuth();
   const router = useRouter();
 
   const [groups, setGroups] = useState<LedgerSummary[]>([]);
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [filter, setFilter] = useState<GroupFilter>("all");
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -23,12 +39,23 @@ export default function GroupsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listMyLedgers(authFetch);
-      setGroups(data.groups);
+      const [ledgers, myBalances] = await Promise.all([
+        listMyLedgers(authFetch),
+        getMyGroupBalances(authFetch),
+      ]);
+      setGroups(ledgers.groups);
+      setBalances(myBalances);
     } finally {
       setLoading(false);
     }
   }, [authFetch]);
+
+  const visibleGroups = groups.filter((g) => {
+    if (filter === "all") return true;
+    const balance = balances[g.id] ?? 0;
+    if (filter === "owe") return balance < -BALANCE_EPSILON;
+    return balance > BALANCE_EPSILON;
+  });
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -109,15 +136,35 @@ export default function GroupsPage() {
           </GlassCard>
         )}
 
+        {!loading && groups.length > 0 && (
+          <div className="flex gap-1.5">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  filter === f.value
+                    ? "bg-accent-tint text-accent-strong"
+                    : "border border-surface-border text-ink-soft hover:bg-surface-strong hover:text-ink"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <p className="text-sm text-ink-soft">Loading…</p>
         ) : groups.length === 0 ? (
           <EmptyState title="No group ledgers yet" hint="Start a trip, event, or tab above." />
+        ) : visibleGroups.length === 0 ? (
+          <EmptyState title="No groups match that filter" />
         ) : (
           <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {groups.map((g) => (
+            {visibleGroups.map((g) => (
               <StaggerItem key={g.id}>
-                <LedgerCard ledger={g} subtitle="Group" />
+                <LedgerCard ledger={g} subtitle="Group" balance={balances[g.id] ?? 0} />
               </StaggerItem>
             ))}
           </StaggerGroup>

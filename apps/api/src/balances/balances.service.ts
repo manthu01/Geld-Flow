@@ -82,4 +82,75 @@ export class BalancesService {
       netBalance: Math.round((net.get(m.userId) ?? 0) * 100) / 100,
     }));
   }
+
+  /**
+   * This user's own net balance in every group ledger they're in, for the
+   * Groups page's All/You-owe/Owed-to-you filter. The mirror image of
+   * getBalances above (one user across many ledgers instead of one
+   * ledger across many members) — same 4-query shape, still never sums
+   * across ledgers, just keyed by ledgerId instead of userId.
+   */
+  async getMyGroupBalances(userId: string): Promise<Record<string, number>> {
+    const memberships = await prisma.ledgerMember.findMany({
+      where: { userId, ledger: { type: { not: 'personal' } } },
+      select: { ledgerId: true },
+    });
+    const ledgerIds = memberships.map((m) => m.ledgerId);
+    if (ledgerIds.length === 0) return {};
+
+    const [credits, shares, settlements] = await Promise.all([
+      prisma.expense.groupBy({
+        by: ['ledgerId'],
+        where: {
+          paidByUserId: userId,
+          deletedAt: null,
+          ledgerId: { in: ledgerIds },
+        },
+        _sum: { amount: true },
+      }),
+      prisma.expenseShare.findMany({
+        where: {
+          userId,
+          expense: { deletedAt: null, ledgerId: { in: ledgerIds } },
+        },
+        select: { shareAmount: true, expense: { select: { ledgerId: true } } },
+      }),
+      prisma.settlement.findMany({
+        where: {
+          status: 'confirmed',
+          ledgerId: { in: ledgerIds },
+          OR: [{ fromUserId: userId }, { toUserId: userId }],
+        },
+        select: {
+          ledgerId: true,
+          fromUserId: true,
+          toUserId: true,
+          amount: true,
+        },
+      }),
+    ]);
+
+    const net = new Map<string, number>(ledgerIds.map((id) => [id, 0]));
+
+    for (const c of credits) {
+      net.set(c.ledgerId, (net.get(c.ledgerId) ?? 0) + toNumber(c._sum.amount));
+    }
+    for (const s of shares) {
+      const ledgerId = s.expense.ledgerId;
+      net.set(ledgerId, (net.get(ledgerId) ?? 0) - toNumber(s.shareAmount));
+    }
+    for (const s of settlements) {
+      const amount = toNumber(s.amount);
+      if (s.fromUserId === userId) {
+        net.set(s.ledgerId, (net.get(s.ledgerId) ?? 0) + amount);
+      }
+      if (s.toUserId === userId) {
+        net.set(s.ledgerId, (net.get(s.ledgerId) ?? 0) - amount);
+      }
+    }
+
+    return Object.fromEntries(
+      [...net.entries()].map(([id, n]) => [id, Math.round(n * 100) / 100]),
+    );
+  }
 }
