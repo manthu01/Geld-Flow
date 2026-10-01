@@ -41,6 +41,9 @@ enum ActivityEventType {
   expense_added
   expense_edited
   expense_deleted
+  expense_deletion_requested
+  expense_deletion_approved
+  expense_deletion_rejected
   settlement_requested
   settlement_confirmed
   settlement_declined
@@ -48,6 +51,30 @@ enum ActivityEventType {
   member_left
   checklist_item_added
   checklist_item_completed
+}
+
+// active -> deletion_requested (a request is pending) -> either back to
+// active (rejected) or cancelled (every required approver agreed).
+// Never a 4th state — see ExpenseActionRequest for the request itself.
+enum ExpenseStatus {
+  active
+  deletion_requested
+  cancelled
+}
+
+// Only "delete" exists today. The model is named generically (not
+// ExpenseDeletionRequest) because the same consent mechanism is meant to
+// extend to edits/amount/split changes later — see /problems/Mutual
+// consent expense deletion.txt — but building those now would be scope
+// nobody asked for yet.
+enum ExpenseActionType {
+  delete
+}
+
+enum ExpenseActionRequestStatus {
+  pending
+  approved
+  rejected
 }
 
 enum Rank {
@@ -124,6 +151,8 @@ model User {
   expensesPaid      Expense[]          @relation("ExpensePaidBy")
   expensesCreated   Expense[]          @relation("ExpenseCreatedBy")
   expenseShares     ExpenseShare[]
+  expenseActionRequests  ExpenseActionRequest[]
+  expenseActionApprovals ExpenseActionApproval[]
   settlementsFrom   Settlement[]       @relation("SettlementFrom")
   settlementsTo     Settlement[]       @relation("SettlementTo")
   activityEvents    ActivityEvent[]
@@ -268,17 +297,61 @@ model Expense {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   // Soft delete only — a voided expense stays for the audit trail but is
-  // excluded from every balance and list query once this is set.
-  deletedAt    DateTime? @map("deleted_at")
+  // excluded from every balance and list query once this is set. Set the
+  // moment status becomes `cancelled`, so every existing `deletedAt: null`
+  // filter keeps working unchanged — status exists alongside it purely to
+  // distinguish "no request yet" from "a request is pending right now".
+  deletedAt    DateTime?     @map("deleted_at")
+  status       ExpenseStatus @default(active)
 
-  ledger    Ledger         @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
-  paidBy    User           @relation("ExpensePaidBy", fields: [paidByUserId], references: [id])
-  createdBy User           @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
-  shares    ExpenseShare[]
+  ledger         Ledger                 @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  paidBy         User                   @relation("ExpensePaidBy", fields: [paidByUserId], references: [id])
+  createdBy      User                   @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  shares         ExpenseShare[]
+  actionRequests ExpenseActionRequest[]
 
   @@index([ledgerId, createdAt])
   @@index([ledgerId, deletedAt])
   @@map("expenses")
+}
+
+// A single shared request — never a per-user copy — so approving or
+// rejecting it is one update that every participant's view reflects
+// identically. See /problems/Mutual consent expense deletion.txt and
+// .../Mutual consent expense deletion(Groups).txt.
+model ExpenseActionRequest {
+  id            String                     @id @default(uuid())
+  expenseId     String                     @map("expense_id")
+  requestedById String                     @map("requested_by")
+  actionType    ExpenseActionType          @map("action_type")
+  status        ExpenseActionRequestStatus @default(pending)
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  resolvedAt    DateTime?                  @map("resolved_at")
+
+  expense     Expense                 @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  requestedBy User                    @relation(fields: [requestedById], references: [id])
+  approvals   ExpenseActionApproval[]
+
+  @@map("expense_action_requests")
+}
+
+// One row per required approver who has actually responded. Required
+// approvers themselves are never stored — they're derived live from the
+// expense's ExpenseShare rows (everyone with a non-zero share, minus the
+// requester) at resolution time, since shares don't change while a
+// request is pending (editing is blocked — see ExpensesService).
+model ExpenseActionApproval {
+  id          String   @id @default(uuid())
+  requestId   String   @map("request_id")
+  userId      String   @map("user_id")
+  approved    Boolean
+  respondedAt DateTime @default(now()) @map("responded_at")
+
+  request ExpenseActionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User                 @relation(fields: [userId], references: [id])
+
+  @@unique([requestId, userId])
+  @@map("expense_action_approvals")
 }
 
 // Computed once when the expense is written (or edited) and stored —

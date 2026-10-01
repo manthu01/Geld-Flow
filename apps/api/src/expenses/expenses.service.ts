@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { prisma, type Expense } from '@geld-flow/db';
+import { prisma, Prisma, type Expense } from '@geld-flow/db';
 import type { CreateExpenseInput, EditExpenseInput } from '@geld-flow/shared';
 import { LedgerAccessService } from '../common/ledger-access.service';
 import { BadgesService } from '../badges/badges.service';
@@ -23,12 +23,86 @@ const EXPENSE_INCLUDE = {
   },
 } as const;
 
+type ExpenseWithIncludes = Prisma.ExpenseGetPayload<{
+  include: typeof EXPENSE_INCLUDE;
+}>;
+
+export interface PendingDeletionView {
+  requestId: string;
+  requestedBy: { id: string; name: string };
+  createdAt: Date;
+  requiredApprovers: {
+    userId: string;
+    name: string;
+    responded: boolean;
+    approved: boolean | null;
+  }[];
+}
+
+function toNumber(value: unknown): number {
+  return value === null || value === undefined ? 0 : Number(value);
+}
+
 @Injectable()
 export class ExpensesService {
   constructor(
     private readonly access: LedgerAccessService,
     private readonly badges: BadgesService,
   ) {}
+
+  /**
+   * Attaches each expense's pending deletion request (if any), with the
+   * live-derived set of required approvers — everyone with a non-zero
+   * share except the requester — so the frontend never has to do that
+   * set math itself. Batched: one query regardless of page size.
+   */
+  private async attachPendingDeletions(
+    expenses: ExpenseWithIncludes[],
+  ): Promise<
+    (ExpenseWithIncludes & { pendingDeletion: PendingDeletionView | null })[]
+  > {
+    const ids = expenses.map((e) => e.id);
+    if (ids.length === 0) return [];
+
+    const requests = await prisma.expenseActionRequest.findMany({
+      where: { expenseId: { in: ids }, status: 'pending' },
+      include: {
+        requestedBy: { select: { id: true, name: true } },
+        approvals: { select: { userId: true, approved: true } },
+      },
+    });
+    const requestByExpenseId = new Map(requests.map((r) => [r.expenseId, r]));
+
+    return expenses.map((expense) => {
+      const request = requestByExpenseId.get(expense.id);
+      if (!request) return { ...expense, pendingDeletion: null };
+
+      const approvalByUser = new Map(
+        request.approvals.map((a) => [a.userId, a.approved]),
+      );
+      const requiredApprovers = expense.shares
+        .filter(
+          (s) =>
+            s.userId !== request.requestedById && toNumber(s.shareAmount) > 0,
+        )
+        .map((s) => ({
+          userId: s.userId,
+          name: s.user.name,
+          responded: approvalByUser.has(s.userId),
+          approved: approvalByUser.get(s.userId) ?? null,
+        }));
+
+      return {
+        ...expense,
+        pendingDeletion: {
+          requestId: request.id,
+          requestedBy: request.requestedBy,
+          createdAt: request.createdAt,
+          requiredApprovers,
+        },
+      };
+    });
+  }
 
   private async assertParticipantsAreMembers(
     ledgerId: string,
@@ -116,7 +190,7 @@ export class ExpensesService {
       return created;
     });
 
-    return expense;
+    return { ...expense, pendingDeletion: null };
   }
 
   async edit(expenseId: string, userId: string, input: EditExpenseInput) {
@@ -125,6 +199,11 @@ export class ExpensesService {
     });
     if (!existing || existing.deletedAt) {
       throw new NotFoundException('Expense not found.');
+    }
+    if (existing.status !== 'active') {
+      throw new BadRequestException(
+        'A deletion request is pending for this expense — resolve it before editing.',
+      );
     }
     await this.assertCanModify(existing, userId);
 
@@ -177,40 +256,202 @@ export class ExpensesService {
       return result;
     });
 
-    return updated;
+    return { ...updated, pendingDeletion: null };
   }
 
-  async softDelete(expenseId: string, userId: string) {
+  /**
+   * Starts (or, if nobody else has a stake, instantly finishes) a
+   * mutual-consent deletion. "Participant" = has a share, paid it, or
+   * created it. See /problems/Mutual consent expense deletion.txt and
+   * .../Mutual consent expense deletion(Groups).txt.
+   */
+  async requestDeletion(expenseId: string, userId: string) {
     const existing = await prisma.expense.findUnique({
       where: { id: expenseId },
+      include: EXPENSE_INCLUDE,
     });
     if (!existing || existing.deletedAt) {
       throw new NotFoundException('Expense not found.');
     }
-    await this.assertCanModify(existing, userId);
+    if (existing.status !== 'active') {
+      throw new BadRequestException(
+        'A deletion request is already pending for this expense.',
+      );
+    }
+    await this.access.assertMember(existing.ledgerId, userId);
+
+    const isParticipant =
+      existing.shares.some((s) => s.userId === userId) ||
+      existing.paidByUserId === userId ||
+      existing.createdById === userId;
+    if (!isParticipant) {
+      throw new ForbiddenException(
+        'Only someone involved in this expense can request its cancellation.',
+      );
+    }
+
+    const requiredApproverIds = existing.shares
+      .filter((s) => s.userId !== userId && toNumber(s.shareAmount) > 0)
+      .map((s) => s.userId);
+
+    if (requiredApproverIds.length === 0) {
+      // Nobody else has a stake — nothing to get consent for.
+      await prisma.$transaction([
+        prisma.expense.update({
+          where: { id: expenseId },
+          data: { status: 'cancelled', deletedAt: new Date() },
+        }),
+        prisma.expenseActionRequest.create({
+          data: {
+            expenseId,
+            requestedById: userId,
+            actionType: 'delete',
+            status: 'approved',
+            resolvedAt: new Date(),
+          },
+        }),
+        prisma.activityEvent.create({
+          data: {
+            ledgerId: existing.ledgerId,
+            actorId: userId,
+            type: 'expense_deletion_approved',
+            payload: { expenseId, description: existing.description },
+          },
+        }),
+      ]);
+      return { id: expenseId, status: 'cancelled' as const };
+    }
 
     await prisma.$transaction([
       prisma.expense.update({
         where: { id: expenseId },
-        data: { deletedAt: new Date() },
+        data: { status: 'deletion_requested' },
+      }),
+      prisma.expenseActionRequest.create({
+        data: { expenseId, requestedById: userId, actionType: 'delete' },
       }),
       prisma.activityEvent.create({
         data: {
           ledgerId: existing.ledgerId,
           actorId: userId,
-          type: 'expense_deleted',
+          type: 'expense_deletion_requested',
           payload: { expenseId, description: existing.description },
         },
       }),
     ]);
+    return { id: expenseId, status: 'deletion_requested' as const };
+  }
 
-    return { id: expenseId };
+  async respondToDeletionRequest(
+    requestId: string,
+    userId: string,
+    approve: boolean,
+  ) {
+    const request = await prisma.expenseActionRequest.findUnique({
+      where: { id: requestId },
+      include: { expense: { include: EXPENSE_INCLUDE } },
+    });
+    if (!request || request.status !== 'pending') {
+      throw new NotFoundException('No pending request found.');
+    }
+    const { expense } = request;
+    await this.access.assertMember(expense.ledgerId, userId);
+
+    if (userId === request.requestedById) {
+      throw new ForbiddenException('You cannot approve your own request.');
+    }
+    const share = expense.shares.find((s) => s.userId === userId);
+    if (!share || toNumber(share.shareAmount) <= 0) {
+      throw new ForbiddenException(
+        'Only participants with a share in this expense can respond.',
+      );
+    }
+    const alreadyResponded = await prisma.expenseActionApproval.findUnique({
+      where: { requestId_userId: { requestId, userId } },
+    });
+    if (alreadyResponded) {
+      throw new BadRequestException('You already responded to this request.');
+    }
+
+    if (!approve) {
+      await prisma.$transaction([
+        prisma.expenseActionApproval.create({
+          data: { requestId, userId, approved: false },
+        }),
+        prisma.expenseActionRequest.update({
+          where: { id: requestId },
+          data: { status: 'rejected', resolvedAt: new Date() },
+        }),
+        prisma.expense.update({
+          where: { id: expense.id },
+          data: { status: 'active' },
+        }),
+        prisma.activityEvent.create({
+          data: {
+            ledgerId: expense.ledgerId,
+            actorId: userId,
+            type: 'expense_deletion_rejected',
+            payload: {
+              expenseId: expense.id,
+              description: expense.description,
+            },
+          },
+        }),
+      ]);
+      return { id: expense.id, status: 'active' as const };
+    }
+
+    const requiredApproverIds = expense.shares
+      .filter(
+        (s) =>
+          s.userId !== request.requestedById && toNumber(s.shareAmount) > 0,
+      )
+      .map((s) => s.userId);
+    const existingApprovals = await prisma.expenseActionApproval.findMany({
+      where: { requestId, approved: true },
+      select: { userId: true },
+    });
+    const approvedSoFar = new Set([
+      ...existingApprovals.map((a) => a.userId),
+      userId,
+    ]);
+    const isComplete = requiredApproverIds.every((id) => approvedSoFar.has(id));
+
+    if (!isComplete) {
+      await prisma.expenseActionApproval.create({
+        data: { requestId, userId, approved: true },
+      });
+      return { id: expense.id, status: 'deletion_requested' as const };
+    }
+
+    await prisma.$transaction([
+      prisma.expenseActionApproval.create({
+        data: { requestId, userId, approved: true },
+      }),
+      prisma.expenseActionRequest.update({
+        where: { id: requestId },
+        data: { status: 'approved', resolvedAt: new Date() },
+      }),
+      prisma.expense.update({
+        where: { id: expense.id },
+        data: { status: 'cancelled', deletedAt: new Date() },
+      }),
+      prisma.activityEvent.create({
+        data: {
+          ledgerId: expense.ledgerId,
+          actorId: userId,
+          type: 'expense_deletion_approved',
+          payload: { expenseId: expense.id, description: expense.description },
+        },
+      }),
+    ]);
+    return { id: expense.id, status: 'cancelled' as const };
   }
 
   async list(ledgerId: string, userId: string, page: number, pageSize: number) {
     await this.access.assertMember(ledgerId, userId);
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       prisma.expense.findMany({
         where: { ledgerId, deletedAt: null },
         include: EXPENSE_INCLUDE,
@@ -220,6 +461,7 @@ export class ExpensesService {
       }),
       prisma.expense.count({ where: { ledgerId, deletedAt: null } }),
     ]);
+    const items = await this.attachPendingDeletions(rawItems);
 
     return { items, total, page, pageSize };
   }

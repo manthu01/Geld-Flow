@@ -16,6 +16,12 @@ export function describeActivity(event: ActivityEventView): string {
       return `${actor} edited "${event.payload.description ?? "an expense"}"`;
     case "expense_deleted":
       return `${actor} deleted "${event.payload.description ?? "an expense"}"`;
+    case "expense_deletion_requested":
+      return `${actor} requested to cancel "${event.payload.description ?? "an expense"}"`;
+    case "expense_deletion_approved":
+      return `"${event.payload.description ?? "An expense"}" was cancelled by mutual consent`;
+    case "expense_deletion_rejected":
+      return `${actor} declined to cancel "${event.payload.description ?? "an expense"}" — it stays active`;
     case "settlement_requested":
       return `${actor} recorded a payment of ${event.payload.amount ?? ""}`;
     case "settlement_confirmed":

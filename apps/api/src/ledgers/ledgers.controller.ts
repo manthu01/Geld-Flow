@@ -67,13 +67,6 @@ export class LedgersController {
     return this.ledgers.listMine(user.id);
   }
 
-  // Must come before ':id' — otherwise "analysis-summary" would be parsed
-  // as a ledger id and 404 against LedgerAccessService.
-  @Get('analysis-summary')
-  getAnalysisSummary(@CurrentUser() user: User) {
-    return this.ledgers.getAnalysisSummary(user.id);
-  }
-
   @Get(':id')
   getDetail(@CurrentUser() user: User, @Param('id') id: string) {
     return this.ledgers.getDetail(id, user.id);

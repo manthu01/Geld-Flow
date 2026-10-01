@@ -93,6 +93,9 @@ export const ACTIVITY_EVENT_TYPES = [
   "expense_added",
   "expense_edited",
   "expense_deleted",
+  "expense_deletion_requested",
+  "expense_deletion_approved",
+  "expense_deletion_rejected",
   "settlement_requested",
   "settlement_confirmed",
   "settlement_declined",
@@ -167,6 +170,17 @@ export const editExpenseSchema = expenseObjectSchema
     { message: "Percentage splits require a percentage on every share." },
   );
 export type EditExpenseInput = z.infer<typeof editExpenseSchema>;
+
+/**
+ * Mutual-consent expense deletion. Requesting takes no body (just the
+ * expense id in the URL) — only responding needs one.
+ */
+export const respondToExpenseActionSchema = z.object({
+  approve: z.boolean(),
+});
+export type RespondToExpenseActionInput = z.infer<
+  typeof respondToExpenseActionSchema
+>;
 
 /**
  * Ledgers: creating a group, inviting into one, and the personal-ledger

@@ -5,49 +5,58 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { GlassCard } from "@/components/glass-card";
-import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion-primitives";
+import { StaggerGroup, StaggerItem, Reveal } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
 import { describeActivity, LEDGER_TYPE_LABELS } from "@/lib/activity";
-import {
-  getAnalysisSummary,
-  type ActivityEventView,
-  type LedgerBrief,
-} from "@/lib/api";
+import { getActivityFeed, type ActivityFeedEntry } from "@/lib/api";
 
-interface FeedEntry {
-  event: ActivityEventView;
-  ledger: LedgerBrief;
-}
-
-interface LedgerStat {
-  ledger: LedgerBrief;
-  expenseCount: number;
-}
+const PAGE_SIZE = 20;
 
 export default function ActivityPage() {
   const { status, authFetch } = useAuth();
   const router = useRouter();
 
-  const [feed, setFeed] = useState<FeedEntry[]>([]);
-  const [stats, setStats] = useState<LedgerStat[]>([]);
+  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Cross-ledger, but never sums money across ledgers — a group debt and a
-  // personal debt between the same two people must never mix. This page
-  // only merges activity as a read-only log and counts expenses per
-  // ledger; every dollar figure the app shows elsewhere stays scoped to
-  // its own ledger. The merge itself happens server-side now (one request
-  // regardless of how many ledgers you're in, instead of 1 + 2 per ledger).
-  const load = useCallback(async () => {
+  // personal debt between the same two people must never mix. This is a
+  // read-only timeline. Fetched 20 at a time — the database only ever
+  // returns the page actually requested, never the whole history.
+  const loadFirstPage = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { stats, feed } = await getAnalysisSummary(authFetch);
-      setStats(stats);
-      setFeed(feed);
+      const result = await getActivityFeed(authFetch, 1, PAGE_SIZE);
+      setEntries(result.items);
+      setPage(1);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load activity.");
     } finally {
       setLoading(false);
     }
   }, [authFetch]);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const nextPage = page + 1;
+      const result = await getActivityFeed(authFetch, nextPage, PAGE_SIZE);
+      setEntries((prev) => [...prev, ...result.items]);
+      setPage(nextPage);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load more activity.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -56,73 +65,60 @@ export default function ActivityPage() {
     }
     if (status === "authenticated") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      void load();
+      void loadFirstPage();
     }
-  }, [status, router, load]);
+  }, [status, router, loadFirstPage]);
 
   if (status !== "authenticated") return null;
 
   return (
     <AppShell>
-      <div className="w-full max-w-5xl space-y-8">
+      <div className="w-full max-w-3xl space-y-6">
         <Reveal className="space-y-1">
           <h1 className="font-display text-2xl font-semibold tracking-tight">Activity</h1>
           <p className="text-sm text-ink-soft">
-            A combined activity log across every ledger you&rsquo;re in. Balances still never mix
-            between ledgers — this is just a timeline.
+            A combined log across every ledger you&rsquo;re in. Balances still never mix between
+            ledgers — this is just a timeline.
           </p>
         </Reveal>
 
         {loading ? (
           <p className="text-sm text-ink-soft">Loading…</p>
+        ) : entries.length === 0 ? (
+          <EmptyState title="No activity yet" />
         ) : (
           <>
-            <section className="space-y-3">
-              <h2 className="font-display text-lg font-medium">Activity per ledger</h2>
-              {stats.length === 0 ? (
-                <EmptyState title="No ledgers yet" hint="Start a group or personal ledger to see activity here." />
-              ) : (
-                <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {stats.map((s) => (
-                    <StaggerItem key={s.ledger.id}>
-                      <GlassCard className="p-4">
-                        <p className="truncate font-medium text-ink">
-                          {s.ledger.name ?? LEDGER_TYPE_LABELS[s.ledger.type]}
-                        </p>
-                        <p className="mt-1 font-mono text-xs text-ink-soft">
-                          {s.expenseCount} expense{s.expenseCount === 1 ? "" : "s"} logged
-                        </p>
-                      </GlassCard>
-                    </StaggerItem>
-                  ))}
-                </StaggerGroup>
-              )}
-            </section>
+            <GlassCard className="p-0">
+              <StaggerGroup className="divide-y divide-surface-border">
+                {entries.map(({ event, ledger }) => (
+                  <StaggerItem
+                    key={event.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-ink-soft"
+                  >
+                    <span>{describeActivity(event)}</span>
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-ink-soft/70">
+                      {ledger.name ?? LEDGER_TYPE_LABELS[ledger.type]}
+                    </span>
+                  </StaggerItem>
+                ))}
+              </StaggerGroup>
+            </GlassCard>
 
-            <section className="space-y-3">
-              <h2 className="font-display text-lg font-medium">Recent activity</h2>
-              {feed.length === 0 ? (
-                <EmptyState title="No activity yet" />
-              ) : (
-                <GlassCard className="p-0">
-                  <StaggerGroup className="divide-y divide-surface-border">
-                    {feed.map(({ event, ledger }) => (
-                      <StaggerItem
-                        key={event.id}
-                        className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-ink-soft"
-                      >
-                        <span>{describeActivity(event)}</span>
-                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-ink-soft/70">
-                          {ledger.name ?? LEDGER_TYPE_LABELS[ledger.type]}
-                        </span>
-                      </StaggerItem>
-                    ))}
-                  </StaggerGroup>
-                </GlassCard>
-              )}
-            </section>
+            {hasMore && (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-strong disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading…" : "Show more"}
+                </button>
+              </div>
+            )}
           </>
         )}
+
+        {error && <p className="text-sm text-owes">{error}</p>}
       </div>
     </AppShell>
   );

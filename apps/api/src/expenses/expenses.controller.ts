@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -14,8 +13,10 @@ import type { User } from '@geld-flow/db';
 import {
   createExpenseSchema,
   editExpenseSchema,
+  respondToExpenseActionSchema,
   type CreateExpenseInput,
   type EditExpenseInput,
+  type RespondToExpenseActionInput,
 } from '@geld-flow/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -63,8 +64,22 @@ export class ExpensesController {
     return this.expenses.edit(id, user.id, body);
   }
 
-  @Delete('expenses/:id')
-  remove(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.expenses.softDelete(id, user.id);
+  @Post('expenses/:id/deletion-requests')
+  requestDeletion(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.expenses.requestDeletion(id, user.id);
+  }
+
+  @Post('expense-action-requests/:requestId/respond')
+  respondToDeletionRequest(
+    @CurrentUser() user: User,
+    @Param('requestId') requestId: string,
+    @Body(new ZodValidationPipe(respondToExpenseActionSchema))
+    body: RespondToExpenseActionInput,
+  ) {
+    return this.expenses.respondToDeletionRequest(
+      requestId,
+      user.id,
+      body.approve,
+    );
   }
 }

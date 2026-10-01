@@ -16,7 +16,6 @@ import {
   confirmSettlement,
   createInvite,
   declineSettlement,
-  deleteExpense,
   deleteLedger,
   getBalances,
   getDebtSimplification,
@@ -25,7 +24,9 @@ import {
   listActivity,
   listExpenses,
   listSettlements,
+  requestExpenseDeletion,
   requestSettlement,
+  respondToDeletionRequest,
   type ActivityEventView,
   type ExpenseView,
   type LedgerDetail,
@@ -120,13 +121,29 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
   }
 
   async function handleDelete(expense: ExpenseView) {
-    if (!window.confirm(`Delete "${expense.description}"?`)) return;
+    const hasOthers = expense.shares.some(
+      (s) => s.userId !== user?.id && Number(s.shareAmount) > 0,
+    );
+    const confirmMessage = hasOthers
+      ? `Request to cancel "${expense.description}"? Everyone else with a share has to agree before it's actually cancelled.`
+      : `Delete "${expense.description}"? Nobody else has a share in it, so this is final.`;
+    if (!window.confirm(confirmMessage)) return;
     setActionError(null);
     try {
-      await deleteExpense(authFetch, expense.id);
+      await requestExpenseDeletion(authFetch, expense.id);
       await load();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Could not delete that expense.");
+      setActionError(err instanceof Error ? err.message : "Could not request that deletion.");
+    }
+  }
+
+  async function handleRespondToDeletion(requestId: string, approve: boolean) {
+    setActionError(null);
+    try {
+      await respondToDeletionRequest(authFetch, requestId, approve);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not record your response.");
     }
   }
 
@@ -289,7 +306,15 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
             ) : (
               <StaggerGroup className="space-y-2">
                 {expenses.map((e) => {
-                  const canEdit = canManage || e.createdById === user?.id;
+                  const canEdit = (canManage || e.createdById === user?.id) && e.status === "active";
+                  const isParticipant =
+                    e.shares.some((s) => s.userId === user?.id) ||
+                    e.paidByUserId === user?.id ||
+                    e.createdById === user?.id;
+                  const pending = e.pendingDeletion;
+                  const myApproval = pending?.requiredApprovers.find((a) => a.userId === user?.id);
+                  const canRespond = pending && myApproval && !myApproval.responded;
+
                   return (
                     <StaggerItem key={e.id}>
                     <GlassCard interactive className="p-4">
@@ -304,27 +329,63 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                           <span className="font-mono text-sm text-ink">
                             {e.amount} {e.currency}
                           </span>
-                          {canEdit && (
+                          {e.status === "active" && (canEdit || isParticipant) && (
                             <div className="flex gap-1.5 text-xs">
-                              <button
-                                onClick={() => {
-                                  setEditingExpense(e);
-                                  setShowAddExpense(false);
-                                }}
-                                className="rounded-md border border-surface-border px-2 py-1 font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(e)}
-                                className="rounded-md border border-owes/30 bg-owes/10 px-2 py-1 font-medium text-owes transition-colors hover:bg-owes/20"
-                              >
-                                Delete
-                              </button>
+                              {canEdit && (
+                                <button
+                                  onClick={() => {
+                                    setEditingExpense(e);
+                                    setShowAddExpense(false);
+                                  }}
+                                  className="rounded-md border border-surface-border px-2 py-1 font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink"
+                                >
+                                  Edit
+                                </button>
+                              )}
+                              {isParticipant && (
+                                <button
+                                  onClick={() => handleDelete(e)}
+                                  className="rounded-md border border-owes/30 bg-owes/10 px-2 py-1 font-medium text-owes transition-colors hover:bg-owes/20"
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
+
+                      {pending && (
+                        <div className="mt-3 rounded-lg border border-surface-border bg-surface-strong/40 p-3 text-xs">
+                          <p className="text-ink-soft">
+                            <span className="font-medium text-ink">{pending.requestedBy.name}</span>
+                            {" "}requested to cancel this —{" "}
+                            {pending.requiredApprovers.filter((a) => !a.responded).length === 0
+                              ? "resolving…"
+                              : `waiting on ${pending.requiredApprovers
+                                  .filter((a) => !a.responded)
+                                  .map((a) => a.name)
+                                  .join(", ")}`}
+                            .
+                          </p>
+                          {canRespond && (
+                            <div className="mt-2 flex gap-1.5">
+                              <button
+                                onClick={() => void handleRespondToDeletion(pending.requestId, true)}
+                                className="rounded-md border border-owed/30 bg-owed/10 px-2 py-1 font-medium text-owed transition-colors hover:bg-owed/20"
+                              >
+                                Agree to cancel
+                              </button>
+                              <button
+                                onClick={() => void handleRespondToDeletion(pending.requestId, false)}
+                                className="rounded-md border border-surface-border px-2 py-1 font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink"
+                              >
+                                Keep it
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </GlassCard>
                     </StaggerItem>
                   );

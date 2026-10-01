@@ -183,15 +183,28 @@ export interface LedgerBrief {
   name: string | null;
 }
 
-export interface AnalysisSummary {
-  stats: { ledger: LedgerBrief; expenseCount: number }[];
-  feed: { event: ActivityEventView; ledger: LedgerBrief }[];
+export interface ActivityFeedEntry {
+  event: ActivityEventView;
+  ledger: LedgerBrief;
 }
 
-export async function getAnalysisSummary(
+export interface ActivityFeedPage {
+  items: ActivityFeedEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+/** The Activity page's "Show More" pagination — one DB-level page of the cross-ledger feed, not the whole history. */
+export async function getActivityFeed(
   authFetch: AuthFetch,
-): Promise<AnalysisSummary> {
-  return parseJson(await authFetch("/ledgers/analysis-summary"));
+  page = 1,
+  pageSize = 20,
+): Promise<ActivityFeedPage> {
+  return parseJson(
+    await authFetch(`/activity/feed?page=${page}&pageSize=${pageSize}`),
+  );
 }
 
 export async function createGroupLedger(
@@ -269,6 +282,18 @@ export interface ExpenseShareView {
   user: { id: string; name: string; avatarUrl: string | null };
 }
 
+export interface PendingDeletionView {
+  requestId: string;
+  requestedBy: { id: string; name: string };
+  createdAt: string;
+  requiredApprovers: {
+    userId: string;
+    name: string;
+    responded: boolean;
+    approved: boolean | null;
+  }[];
+}
+
 export interface ExpenseView {
   id: string;
   ledgerId: string;
@@ -281,9 +306,11 @@ export interface ExpenseView {
   createdById: string;
   createdAt: string;
   updatedAt: string;
+  status: "active" | "deletion_requested" | "cancelled";
   paidBy: { id: string; name: string; avatarUrl: string | null };
   createdBy: { id: string; name: string; avatarUrl: string | null };
   shares: ExpenseShareView[];
+  pendingDeletion: PendingDeletionView | null;
 }
 
 export interface ExpenseShareInput {
@@ -335,12 +362,27 @@ export async function editExpense(
   return parseJson(res);
 }
 
-export async function deleteExpense(
+export async function requestExpenseDeletion(
   authFetch: AuthFetch,
   expenseId: string,
-): Promise<{ id: string }> {
-  const res = await authFetch(`/expenses/${expenseId}`, { method: "DELETE" });
-  return parseJson(res);
+): Promise<{ id: string; status: "deletion_requested" | "cancelled" }> {
+  return parseJson(
+    await postJson(authFetch, `/expenses/${expenseId}/deletion-requests`),
+  );
+}
+
+export async function respondToDeletionRequest(
+  authFetch: AuthFetch,
+  requestId: string,
+  approve: boolean,
+): Promise<{ id: string; status: "active" | "deletion_requested" | "cancelled" }> {
+  return parseJson(
+    await postJson(
+      authFetch,
+      `/expense-action-requests/${requestId}/respond`,
+      { approve },
+    ),
+  );
 }
 
 // --------------------------------------------------------------- Balances
