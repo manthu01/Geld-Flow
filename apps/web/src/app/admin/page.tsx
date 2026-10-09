@@ -10,6 +10,7 @@ import {
   getAdminStats,
   listAdminUsers,
   setUserPassword,
+  wipeDatabase,
   type AdminStats,
   type AdminUserView,
 } from "@/lib/api";
@@ -112,6 +113,61 @@ function SetPasswordModal({
       </GlassCard>
     </div>,
     document.body,
+  );
+}
+
+function DangerZone() {
+  const { authFetch, logout } = useAuth();
+  const router = useRouter();
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleWipe() {
+    setBusy(true);
+    setError(null);
+    try {
+      await wipeDatabase(authFetch);
+      await logout();
+      router.replace("/login");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not wipe the database.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-lg font-medium text-owes">Danger zone</h2>
+      <GlassCard className="space-y-3 border-owes/30 p-6">
+        <div>
+          <p className="text-sm font-medium text-ink">Wipe all data</p>
+          <p className="text-xs text-ink-soft">
+            Permanently deletes every user, ledger, expense, settlement, and everything else —
+            a clean slate. Your own account (including this admin session) is deleted too; the
+            badge catalog is untouched. This cannot be undone.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder='Type "WIPE" to confirm'
+            className="w-full max-w-xs rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <button
+            type="button"
+            disabled={confirmText !== "WIPE" || busy}
+            onClick={handleWipe}
+            className="rounded-lg bg-owes px-4 py-2 text-sm font-medium text-white transition-all hover:bg-owes/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? "Wiping…" : "Wipe all data"}
+          </button>
+        </div>
+        {error && <p className="text-sm text-owes">{error}</p>}
+      </GlassCard>
+    </section>
   );
 }
 
@@ -231,6 +287,8 @@ export default function AdminPage() {
                 </table>
               </GlassCard>
             </section>
+
+            <DangerZone />
           </>
         )}
       </div>

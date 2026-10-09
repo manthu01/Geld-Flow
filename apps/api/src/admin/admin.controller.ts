@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import {
   adminSetPasswordSchema,
   type AdminSetPasswordInput,
@@ -31,5 +31,11 @@ export class AdminController {
   ) {
     await this.adminService.setUserPassword(id, body.newPassword);
     return { message: 'Password updated.' };
+  }
+
+  @Delete('wipe-database')
+  async wipeDatabase() {
+    await this.adminService.wipeDatabase();
+    return { message: 'Database wiped.' };
   }
 }

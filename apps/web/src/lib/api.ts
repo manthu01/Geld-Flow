@@ -695,3 +695,11 @@ export async function setUserPassword(
     throw new Error(readErrorMessage(data));
   }
 }
+
+export async function wipeDatabase(authFetch: AuthFetch): Promise<void> {
+  const res = await authFetch("/admin/wipe-database", { method: "DELETE" });
+  if (!res.ok) {
+    const data: unknown = await res.json();
+    throw new Error(readErrorMessage(data));
+  }
+}

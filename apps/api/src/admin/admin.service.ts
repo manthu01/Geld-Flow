@@ -83,4 +83,22 @@ export class AdminService {
     }
     await this.authService.adminSetPassword(userId, newPassword);
   }
+
+  /**
+   * Nukes every user-generated row for a clean-slate demo reset. Leaves
+   * `badges` alone — it's a static catalog re-seeded by BadgesService on
+   * boot, not user data, and truncating it would just force a restart to
+   * get badge icons back. CASCADE handles every FK regardless of order.
+   */
+  async wipeDatabase(): Promise<void> {
+    await prisma.$executeRawUnsafe(`
+      TRUNCATE TABLE
+        users, auth_identities, refresh_tokens,
+        ledgers, ledger_members, invites, activity_events,
+        expenses, expense_action_requests, expense_action_approvals, expense_shares,
+        settlements, user_scores, user_badges,
+        checklist_items, chat_links, telegram_link_codes, feedback
+      CASCADE
+    `);
+  }
 }
