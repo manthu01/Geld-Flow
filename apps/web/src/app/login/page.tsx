@@ -1,10 +1,13 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL, checkEmailExists, login } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { GlassCard } from "@/components/glass-card";
+import { AuthShell } from "@/components/auth-shell";
+import { PasswordInput } from "@/components/password-input";
+import { GoogleLogo } from "@/components/google-logo";
 
 function LoginError() {
   const params = useSearchParams();
@@ -23,70 +26,39 @@ function LoginError() {
   );
 }
 
-function GoogleLogo() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0">
-      <path
-        fill="#4285F4"
-        d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.63h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.58-5.17 3.58-8.81Z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 24c3.24 0 5.96-1.07 7.94-2.92l-3.87-3c-1.08.72-2.46 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11A11.998 11.998 0 0 0 12 24Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.27 14.27a7.2 7.2 0 0 1 0-4.54V6.62H1.27a12 12 0 0 0 0 10.76l4-3.11Z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 4.77c1.76 0 3.34.6 4.59 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.11C6.22 6.88 8.87 4.77 12 4.77Z"
-      />
-    </svg>
-  );
+function PrefillEmail({ onPrefill }: { onPrefill: (email: string) => void }) {
+  const params = useSearchParams();
+  const prefill = params.get("email");
+  useEffect(() => {
+    if (prefill) onPrefill(prefill);
+  }, [prefill, onPrefill]);
+  return null;
 }
-
-type Step = "email" | "password";
 
 export default function LoginPage() {
   const router = useRouter();
   const { completeLogin } = useAuth();
 
-  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [exists, setExists] = useState(false);
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [noAccountFor, setNoAccountFor] = useState<string | null>(null);
 
-  async function handleEmailSubmit(event: FormEvent) {
-    event.preventDefault();
-    setStatus("loading");
-    setErrorMessage(null);
-    try {
-      const found = await checkEmailExists(email);
-      setExists(found);
-      setStep("password");
-      setStatus("idle");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Something went wrong.");
-      setStatus("error");
-    }
-  }
-
-  async function handlePasswordSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setErrorMessage(null);
-
-    if (!exists && password !== confirmPassword) {
-      setErrorMessage("Those passwords don't match.");
-      setStatus("error");
-      return;
-    }
-
+    setNoAccountFor(null);
     setStatus("loading");
+
     try {
+      const exists = await checkEmailExists(email);
+      if (!exists) {
+        setNoAccountFor(email);
+        setStatus("idle");
+        return;
+      }
+
       const result = await login(email, password);
       completeLogin(result);
       router.replace("/");
@@ -97,131 +69,87 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-24">
-      <div className="animate-fade-in-up w-full max-w-sm space-y-6">
-        <div className="space-y-2 text-center">
-          <div className="flex justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
-            <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-14 w-14 rounded-2xl" />
-          </div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
-            Sign in to Geld Flow
-          </h1>
-          <p className="text-sm text-ink-soft">
-            {step === "email" ? "Enter your email to continue." : exists ? "Welcome back." : "Choose a password to create your account."}
-          </p>
-        </div>
+    <AuthShell
+      title="Sign in to Geld Flow"
+      subtitle="Welcome back — enter your details to continue."
+      footer={
+        <>
+          New here?{" "}
+          <Link href="/signup" className="font-medium text-accent-strong hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <Suspense fallback={null}>
+        <PrefillEmail onPrefill={setEmail} />
+      </Suspense>
 
+      <div className="space-y-5">
         <Suspense fallback={null}>
           <LoginError />
         </Suspense>
 
-        <GlassCard className="overflow-hidden p-6">
-          {step === "email" ? (
-            <div className="space-y-5">
-              <form onSubmit={handleEmailSubmit} className="space-y-3">
-                <label className="block space-y-1.5">
-                  <span className="text-xs uppercase tracking-wide text-ink-soft">
-                    Email
-                  </span>
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </label>
-                {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
-                <button
-                  type="submit"
-                  disabled={status === "loading"}
-                  className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
-                >
-                  {status === "loading" ? "Checking…" : "Continue"}
-                </button>
-              </form>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <label className="block space-y-1.5">
+            <span className="text-xs uppercase tracking-wide text-ink-soft">Email</span>
+            <input
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setNoAccountFor(null);
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+              className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </label>
 
-              <div className="flex items-center gap-3 text-xs text-ink-soft">
-                <span className="h-px flex-1 bg-surface-border" />
-                or
-                <span className="h-px flex-1 bg-surface-border" />
-              </div>
+          <label className="block space-y-1.5">
+            <span className="text-xs uppercase tracking-wide text-ink-soft">Password</span>
+            <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
+          </label>
 
-              <a
-                href={`${API_URL}/auth/google`}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
+          {noAccountFor && (
+            <p className="text-sm text-ink-soft">
+              No account found for {noAccountFor}.{" "}
+              <Link
+                href={`/signup?email=${encodeURIComponent(noAccountFor)}`}
+                className="font-medium text-accent-strong hover:underline"
               >
-                <GoogleLogo />
-                Continue with Google
-              </a>
-            </div>
-          ) : (
-            <form onSubmit={handlePasswordSubmit} className="space-y-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setStep("email");
-                  setPassword("");
-                  setConfirmPassword("");
-                  setErrorMessage(null);
-                }}
-                className="text-xs text-ink-soft underline underline-offset-2 hover:text-ink"
-              >
-                {email} — use a different email
-              </button>
-
-              <label className="block space-y-1.5">
-                <span className="text-xs uppercase tracking-wide text-ink-soft">
-                  Password
-                </span>
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </label>
-
-              {!exists && (
-                <label className="block space-y-1.5">
-                  <span className="text-xs uppercase tracking-wide text-ink-soft">
-                    Confirm password
-                  </span>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-lg border border-surface-border bg-bg-elevated px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </label>
-              )}
-
-              {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
-              <button
-                type="submit"
-                disabled={status === "loading"}
-                className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
-              >
-                {status === "loading"
-                  ? "Please wait…"
-                  : exists
-                    ? "Sign in"
-                    : "Create account"}
-              </button>
-            </form>
+                Create one instead
+              </Link>
+              .
+            </p>
           )}
-        </GlassCard>
+          {errorMessage && <p className="text-sm text-owes">{errorMessage}</p>}
+
+          <button
+            type="submit"
+            disabled={status === "loading"}
+            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-all hover:bg-accent-strong active:scale-95 disabled:opacity-60"
+          >
+            {status === "loading" ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3 text-xs text-ink-soft">
+          <span className="h-px flex-1 bg-surface-border" />
+          or
+          <span className="h-px flex-1 bg-surface-border" />
+        </div>
+
+        <a
+          href={`${API_URL}/auth/google`}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-border bg-bg-elevated px-4 py-2 text-sm font-medium text-ink transition-all hover:bg-surface-strong active:scale-95"
+        >
+          <GoogleLogo />
+          Continue with Google
+        </a>
       </div>
-    </main>
+    </AuthShell>
   );
 }
