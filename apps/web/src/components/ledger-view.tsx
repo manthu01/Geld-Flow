@@ -423,16 +423,18 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
             <GlassCard className="p-0">
               <StaggerGroup className="divide-y divide-surface-border">
               {balances.map((b) => (
-                <StaggerItem key={b.userId} className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-ink">
-                    {b.userId === user?.id ? "You" : b.name}{" "}
-                    <span className="font-mono text-xs text-ink-soft">
+                <StaggerItem key={b.userId} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="min-w-0 shrink-0">
+                    <span className="block truncate text-sm text-ink">
+                      {b.userId === user?.id ? "You" : b.name}
+                    </span>
+                    <span className="block font-mono text-[10px] uppercase tracking-wide text-ink-soft">
                       {rankLabel(scores[b.userId])}
                     </span>
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     <span
-                      className={`font-mono text-sm font-medium ${
+                      className={`font-display text-base font-semibold tabular-nums ${
                         b.netBalance > 0
                           ? "text-owed"
                           : b.netBalance < 0
@@ -463,11 +465,14 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
 
           {debtSuggestions.length > 0 && (
             <section className="space-y-3">
-              <h2 className="font-display text-lg font-medium">Simplify debts</h2>
+              <h2 className="flex items-center gap-2 font-display text-lg font-medium">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+                Simplify debts
+              </h2>
               <p className="text-xs text-ink-soft">
                 The fewest payments that would settle everyone up.
               </p>
-              <GlassCard className="p-0">
+              <GlassCard className="border-accent/30 bg-accent-tint/20 p-0 shadow-[0_0_0_1px_var(--accent-tint),0_20px_50px_-24px_var(--accent-tint)]">
               <StaggerGroup className="divide-y divide-surface-border">
                 {debtSuggestions.map((t, i) => (
                   <StaggerItem
@@ -478,7 +483,7 @@ export function LedgerView({ ledgerId }: { ledgerId: string }) {
                       {t.fromUserId === user?.id ? "You" : memberById.get(t.fromUserId)?.name}{" "}
                       owe{t.fromUserId === user?.id ? "" : "s"}{" "}
                       {t.toUserId === user?.id ? "you" : memberById.get(t.toUserId)?.name}{" "}
-                      <span className="font-mono">
+                      <span className="font-display font-semibold tabular-nums text-accent-strong">
                         {t.amount.toFixed(2)} {ledger.baseCurrency}
                       </span>
                     </span>

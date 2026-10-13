@@ -245,7 +245,7 @@ export default function AccountPage() {
     <AppShell>
       <div className="w-full max-w-3xl space-y-8">
         <Reveal className="space-y-1">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Account</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Account</h1>
           <p className="text-sm text-ink-soft">Your profile, and a few things about Geld Flow.</p>
         </Reveal>
 
@@ -261,10 +261,10 @@ export default function AccountPage() {
                 <img
                   src={user.avatarUrl}
                   alt=""
-                  className="h-14 w-14 shrink-0 rounded-full object-cover"
+                  className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-accent-tint"
                 />
               ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-accent font-mono text-lg font-semibold text-on-accent">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent font-mono text-xl font-semibold text-on-accent ring-2 ring-accent-tint">
                   {initials(user?.name)}
                 </div>
               )}

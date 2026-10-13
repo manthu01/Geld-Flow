@@ -7,6 +7,20 @@ export const LEDGER_TYPE_LABELS: Record<string, string> = {
   personal: "Personal ledger",
 };
 
+/** Coarse color grouping for the small indicator dot next to each activity row. */
+export function activityAccent(type: ActivityEventView["type"]): "owed" | "owes" | "neutral" {
+  switch (type) {
+    case "settlement_confirmed":
+      return "owed";
+    case "expense_deleted":
+    case "expense_deletion_approved":
+    case "settlement_declined":
+      return "owes";
+    default:
+      return "neutral";
+  }
+}
+
 export function describeActivity(event: ActivityEventView): string {
   const actor = event.actor.name;
   switch (event.type) {

@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { GlassCard } from "@/components/glass-card";
 import { StaggerGroup, StaggerItem, Reveal } from "@/components/motion-primitives";
 import { useAuth } from "@/lib/auth-context";
-import { describeActivity, LEDGER_TYPE_LABELS } from "@/lib/activity";
+import { activityAccent, describeActivity, LEDGER_TYPE_LABELS } from "@/lib/activity";
 import { getActivityFeed, type ActivityFeedEntry } from "@/lib/api";
 
 const PAGE_SIZE = 20;
@@ -75,7 +75,7 @@ export default function ActivityPage() {
     <AppShell>
       <div className="w-full max-w-3xl space-y-6">
         <Reveal className="space-y-1">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Activity</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Activity</h1>
           <p className="text-sm text-ink-soft">
             A combined log across every ledger you&rsquo;re in. Balances still never mix between
             ledgers — this is just a timeline.
@@ -90,17 +90,30 @@ export default function ActivityPage() {
           <>
             <GlassCard className="p-0">
               <StaggerGroup className="divide-y divide-surface-border">
-                {entries.map(({ event, ledger }) => (
-                  <StaggerItem
-                    key={event.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-ink-soft"
-                  >
-                    <span>{describeActivity(event)}</span>
-                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-ink-soft/70">
-                      {ledger.name ?? LEDGER_TYPE_LABELS[ledger.type]}
-                    </span>
-                  </StaggerItem>
-                ))}
+                {entries.map(({ event, ledger }) => {
+                  const accent = activityAccent(event.type);
+                  return (
+                    <StaggerItem
+                      key={event.id}
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-ink-soft"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          accent === "owed"
+                            ? "bg-owed"
+                            : accent === "owes"
+                              ? "bg-owes"
+                              : "bg-ink-soft/40"
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1">{describeActivity(event)}</span>
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-ink-soft/70">
+                        {ledger.name ?? LEDGER_TYPE_LABELS[ledger.type]}
+                      </span>
+                    </StaggerItem>
+                  );
+                })}
               </StaggerGroup>
             </GlassCard>
 

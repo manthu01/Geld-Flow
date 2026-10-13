@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { BalanceAmount, balanceAccentClass } from "@/components/balance-amount";
 import { EmptyState } from "@/components/empty-state";
 import { GlassCard } from "@/components/glass-card";
 import { PersonalLedgerForm } from "@/components/personal-ledger-form";
@@ -38,16 +39,20 @@ function FriendRow({
   );
 
   return (
-    <GlassCard className="p-0">
+    <GlassCard className="relative overflow-hidden p-0">
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-0 left-0 w-1 ${balanceAccentClass(overall)}`}
+      />
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-3 p-4 text-left"
+        className="flex w-full items-center gap-4 py-4 pl-6 pr-4 text-left"
       >
         {friend.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- arbitrary user-supplied URL, next/image can't optimize it
-          <img src={friend.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+          <img src={friend.avatarUrl} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-mono text-xs font-semibold text-on-accent">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent font-mono text-sm font-semibold text-on-accent">
             {initials(friend.name)}
           </div>
         )}
@@ -60,13 +65,7 @@ function FriendRow({
               </span>
             )}
           </div>
-          {Math.abs(overall) < BALANCE_EPSILON ? (
-            <p className="text-xs text-ink-soft">Settled up overall</p>
-          ) : (
-            <p className={`text-xs font-medium ${overall > 0 ? "text-owed" : "text-owes"}`}>
-              {overall > 0 ? "Owes you" : "You owe"} {formatMoney(Math.abs(overall), displayCurrency)} overall
-            </p>
-          )}
+          <BalanceAmount balance={overall} currency={displayCurrency} settledLabel="Settled up overall" />
         </div>
         <svg
           width="16"
@@ -81,7 +80,7 @@ function FriendRow({
       </button>
 
       {expanded && (
-        <div className="space-y-1 border-t border-surface-border p-4 pt-3">
+        <div className="space-y-1 border-t border-surface-border py-3 pl-6 pr-4">
           {breakdown.length === 0 ? (
             <p className="text-xs text-ink-soft">No shared expenses yet.</p>
           ) : (
@@ -148,7 +147,7 @@ export default function FriendsPage() {
       <div className="w-full max-w-3xl space-y-6">
         <Reveal className="flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Friends</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight">Friends</h1>
             <p className="text-sm text-ink-soft">
               Your overall balance with everyone you&rsquo;ve split with — personal tabs and
               every group combined. Each ledger still keeps its own balance; this is just a

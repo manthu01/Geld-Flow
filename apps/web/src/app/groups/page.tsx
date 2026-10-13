@@ -94,7 +94,7 @@ function GroupsContent() {
       <div className="w-full max-w-6xl space-y-6">
         <Reveal className="flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Groups</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight">Groups</h1>
             <p className="text-sm text-ink-soft">Trips, events, and shared tabs with everyone in.</p>
           </div>
           <button

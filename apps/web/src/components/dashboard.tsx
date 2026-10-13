@@ -88,12 +88,12 @@ export function Dashboard() {
 
   return (
     <div className="w-full max-w-6xl space-y-8">
-      <Reveal className="space-y-1">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
+      <Reveal className="space-y-2">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
           Welcome back, {user?.name?.split(" ")[0]}
         </h1>
         {score && (
-          <p className="font-mono text-xs text-ink-soft">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-accent-tint px-2.5 py-1 font-mono text-xs text-accent-strong">
             Rank {score.currentRank} · {score.confirmedSettlements} settlement
             {score.confirmedSettlements === 1 ? "" : "s"} confirmed
           </p>
@@ -198,7 +198,10 @@ export function Dashboard() {
       {!loading && !error && (
         <>
           <section className="space-y-3">
-            <h2 className="font-display text-lg font-medium">Groups</h2>
+            <h2 className="flex items-center gap-2 font-display text-lg font-medium">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+              Groups
+            </h2>
             {groups.length === 0 ? (
               <EmptyState title="No group ledgers yet" hint="Start a trip, event, or tab above." />
             ) : (
@@ -213,7 +216,10 @@ export function Dashboard() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-display text-lg font-medium">Personal</h2>
+            <h2 className="flex items-center gap-2 font-display text-lg font-medium">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent-2" />
+              Personal
+            </h2>
             {personal.length === 0 ? (
               <EmptyState title="No personal ledgers yet" hint="Open one with a friend's email above." />
             ) : (

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { GlassCard } from "@/components/glass-card";
+import { BalanceAmount, balanceAccentClass } from "@/components/balance-amount";
 import type { LedgerSummary } from "@/lib/api";
 
 export const GROUP_TYPE_LABELS: Record<string, string> = {
@@ -9,20 +10,6 @@ export const GROUP_TYPE_LABELS: Record<string, string> = {
   group_travel: "Travel",
   group_event: "Event",
 };
-
-const BALANCE_EPSILON = 0.005;
-
-function BalanceLine({ balance, currency }: { balance: number; currency: string }) {
-  if (Math.abs(balance) < BALANCE_EPSILON) {
-    return <p className="mt-1 text-xs text-ink-soft">Settled up</p>;
-  }
-  const owed = balance > 0;
-  return (
-    <p className={`mt-1 text-xs font-medium ${owed ? "text-owed" : "text-owes"}`}>
-      {owed ? "Owed" : "You owe"} {currency} {Math.abs(balance).toFixed(2)}
-    </p>
-  );
-}
 
 export function LedgerCard({
   ledger,
@@ -38,22 +25,30 @@ export function LedgerCard({
   const router = useRouter();
   return (
     <GlassCard
-      className="cursor-pointer p-4"
+      className="relative cursor-pointer overflow-hidden p-4 pl-5"
       interactive
       glow
       onClick={() => router.push(`/ledgers/${ledger.id}`)}
     >
+      {balance !== undefined && (
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-0 w-1 ${balanceAccentClass(balance)}`}
+        />
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-medium text-ink">
           {ledger.name ?? subtitle}
         </span>
-        <span className="font-mono text-xs text-ink-soft">
+        <span className="font-mono text-[10px] uppercase tracking-wide text-ink-soft">
           {ledger.type === "personal"
             ? "Personal"
             : GROUP_TYPE_LABELS[ledger.type]}
         </span>
       </div>
-      <div className="mt-1 flex items-center gap-2">
+
+      <div className="mt-0.5 flex items-center gap-2">
         <p className="text-xs text-ink-soft">
           {ledger.type === "personal" ? subtitle : `${ledger._count?.members ?? ledger.members.length} members`}
         </p>
@@ -63,7 +58,12 @@ export function LedgerCard({
           </span>
         )}
       </div>
-      {balance !== undefined && <BalanceLine balance={balance} currency={ledger.baseCurrency} />}
+
+      {balance !== undefined && (
+        <div className="mt-3">
+          <BalanceAmount balance={balance} currency={ledger.baseCurrency} />
+        </div>
+      )}
     </GlassCard>
   );
 }
