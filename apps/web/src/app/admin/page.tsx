@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { GlassCard } from "@/components/glass-card";
 import { useAuth } from "@/lib/auth-context";
 import {
+  deleteAdminUser,
   getAdminStats,
   listAdminUsers,
   setUserPassword,
@@ -14,6 +15,8 @@ import {
   type AdminStats,
   type AdminUserView,
 } from "@/lib/api";
+
+const USERS_PER_PAGE = 10;
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -116,6 +119,70 @@ function SetPasswordModal({
   );
 }
 
+function DeleteUserModal({
+  targetUser,
+  onClose,
+  onDeleted,
+}: {
+  targetUser: AdminUserView;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const { authFetch } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteAdminUser(authFetch, targetUser.id);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove that user.");
+      setBusy(false);
+    }
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      onClick={onClose}
+    >
+      <GlassCard className="w-full max-w-sm space-y-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink">Remove user</h2>
+          <p className="text-xs text-ink-soft">
+            Remove <span className="font-medium text-ink">{targetUser.name}</span> (@
+            {targetUser.username})? If they share no ledgers with anyone this deletes them
+            outright; otherwise their account is redacted but shared history stays intact for
+            everyone else. This cannot be undone.
+          </p>
+        </div>
+        {error && <p className="text-sm text-owes">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleDelete}
+            className="flex-1 rounded-lg bg-owes px-4 py-2 text-sm font-medium text-white transition-all hover:bg-owes/90 active:scale-95 disabled:opacity-60"
+          >
+            {busy ? "Removing…" : "Remove user"}
+          </button>
+        </div>
+      </GlassCard>
+    </div>,
+    document.body,
+  );
+}
+
 function DangerZone() {
   const { authFetch, logout } = useAuth();
   const router = useRouter();
@@ -180,6 +247,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUserView | null>(null);
+  const [deletingUser, setDeletingUser] = useState<AdminUserView | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -210,6 +280,16 @@ export default function AdminPage() {
       void load();
     }
   }, [status, router, load]);
+
+  const filteredUsers = search.trim()
+    ? users.filter((u) => u.username.toLowerCase().includes(search.trim().toLowerCase()))
+    : users;
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedUsers = filteredUsers.slice(
+    (currentPage - 1) * USERS_PER_PAGE,
+    currentPage * USERS_PER_PAGE,
+  );
 
   if (status !== "authenticated") return null;
 
@@ -243,7 +323,19 @@ export default function AdminPage() {
             )}
 
             <section className="space-y-3">
-              <h2 className="font-display text-lg font-medium">Users</h2>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="font-display text-lg font-medium">Users</h2>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search by username…"
+                  className="w-full max-w-xs rounded-lg border border-surface-border bg-bg px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
               <GlassCard className="overflow-x-auto p-0">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -252,40 +344,92 @@ export default function AdminPage() {
                       <th className="px-4 py-3 font-medium">Username</th>
                       <th className="px-4 py-3 font-medium">Email</th>
                       <th className="px-4 py-3 font-medium">Password</th>
+                      <th className="px-4 py-3 font-medium">Remove</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-surface-border">
-                    {users.map((u) => (
-                      <tr key={u.id}>
-                        <td className="px-4 py-3 text-ink">{u.name}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-accent-strong">@{u.username}</td>
-                        <td className="px-4 py-3 text-ink-soft">{u.email}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-ink-soft">
-                              {u.hasPassword ? "••••••••" : "Not set"}
-                            </span>
+                    {pagedUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-ink-soft">
+                          No users match &ldquo;{search}&rdquo;.
+                        </td>
+                      </tr>
+                    ) : (
+                      pagedUsers.map((u) => (
+                        <tr key={u.id}>
+                          <td className="px-4 py-3 text-ink">{u.name}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-accent-strong">@{u.username}</td>
+                          <td className="px-4 py-3 text-ink-soft">{u.email}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-ink-soft">
+                                {u.hasPassword ? "••••••••" : "Not set"}
+                              </span>
+                              <button
+                                onClick={() => setEditingUser(u)}
+                                aria-label={`Set a new password for ${u.name}`}
+                                className="rounded-md p-1 text-ink-soft hover:bg-surface-strong hover:text-ink"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                  <path
+                                    d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.4"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
                             <button
-                              onClick={() => setEditingUser(u)}
-                              aria-label={`Set a new password for ${u.name}`}
-                              className="rounded-md p-1 text-ink-soft hover:bg-surface-strong hover:text-ink"
+                              onClick={() => setDeletingUser(u)}
+                              aria-label={`Remove ${u.name}`}
+                              className="rounded-md p-1 text-ink-soft hover:bg-owes/10 hover:text-owes"
                             >
                               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                                 <path
-                                  d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5Z"
+                                  d="M5 6h10M8.5 6V4.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1V6M6.5 6l.6 9a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-9"
                                   stroke="currentColor"
                                   strokeWidth="1.4"
+                                  strokeLinecap="round"
                                   strokeLinejoin="round"
                                 />
                               </svg>
                             </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </GlassCard>
+              {filteredUsers.length > 0 && (
+                <div className="flex items-center justify-between text-sm text-ink-soft">
+                  <span>
+                    Page {currentPage} of {totalPages} &middot; {filteredUsers.length} user
+                    {filteredUsers.length === 1 ? "" : "s"}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      className="rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-surface-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
 
             <DangerZone />
@@ -299,6 +443,17 @@ export default function AdminPage() {
           onClose={() => setEditingUser(null)}
           onSaved={() => {
             setEditingUser(null);
+            void load();
+          }}
+        />
+      )}
+
+      {deletingUser && (
+        <DeleteUserModal
+          targetUser={deletingUser}
+          onClose={() => setDeletingUser(null)}
+          onDeleted={() => {
+            setDeletingUser(null);
             void load();
           }}
         />

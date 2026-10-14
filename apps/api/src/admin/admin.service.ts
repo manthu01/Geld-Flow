@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { prisma } from '@geld-flow/db';
 import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   async getStats() {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -82,6 +90,22 @@ export class AdminService {
       throw new NotFoundException('No such user.');
     }
     await this.authService.adminSetPassword(userId, newPassword);
+  }
+
+  /**
+   * Removes a single user from the admin's user list. Reuses the same
+   * redact-or-hard-delete logic a user's own self-deletion goes through,
+   * so shared ledger history survives for everyone else still in it.
+   */
+  async deleteUser(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('No such user.');
+    }
+    if (user.email === this.config.get<string>('ADMIN_EMAIL')) {
+      throw new BadRequestException('Cannot remove the admin account.');
+    }
+    await this.authService.deleteOwnAccount(userId);
   }
 
   /**
