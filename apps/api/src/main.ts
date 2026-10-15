@@ -15,6 +15,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error: unknown) => {
-  console.error('Failed to start Geld Flow API', error);
+  console.error('Failed to start Ledgr API', error);
   process.exit(1);
 });

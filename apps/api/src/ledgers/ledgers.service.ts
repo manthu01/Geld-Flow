@@ -19,7 +19,7 @@ function hashToken(rawToken: string): string {
 }
 
 // Shadow (unclaimed) member support: an admin can add someone to a
-// personal ledger who has no Geld Flow account yet. That creates a real
+// personal ledger who has no Ledgr account yet. That creates a real
 // User row (isShadow: true) with a synthetic email so every expense,
 // share, and settlement can reference it exactly like a real member.
 // The claim link lets that person later attach their own account — see
@@ -221,7 +221,7 @@ export class LedgersService {
       });
       if (!peer) {
         throw new NotFoundException(
-          'No Geld Flow account found for that email yet — add them by name instead, or ask them to sign up first.',
+          'No Ledgr account found for that email yet — add them by name instead, or ask them to sign up first.',
         );
       }
       if (peer.id === userId) {

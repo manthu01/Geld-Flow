@@ -246,7 +246,7 @@ export default function AccountPage() {
       <div className="w-full max-w-3xl space-y-8">
         <Reveal className="space-y-1">
           <h1 className="font-display text-3xl font-semibold tracking-tight">Account</h1>
-          <p className="text-sm text-ink-soft">Your profile, and a few things about Geld Flow.</p>
+          <p className="text-sm text-ink-soft">Your profile, and a few things about Ledgr.</p>
         </Reveal>
 
         <Reveal delay={0.05}>
@@ -320,9 +320,9 @@ export default function AccountPage() {
         </Reveal>
 
         <Reveal delay={0.2} className="space-y-2">
-          <h2 className="font-display text-lg font-medium">About Geld Flow</h2>
+          <h2 className="font-display text-lg font-medium">About Ledgr</h2>
           <p className="text-sm text-ink-soft">
-            Geld Flow keeps every ledger — a group trip, an event, a one-on-one tab — completely
+            Ledgr keeps every ledger — a group trip, an event, a one-on-one tab — completely
             isolated. What you owe a friend on a personal split never mixes with what a whole
             group owes each other, even if it&rsquo;s the same two people. Settling up raises your
             rank; nothing about the app ever pushes it back down.

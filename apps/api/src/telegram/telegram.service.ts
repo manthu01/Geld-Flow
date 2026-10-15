@@ -182,7 +182,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (text.startsWith('/start')) {
       await this.reply(
         chatId,
-        'Hi! I log expenses into Geld Flow. Generate a link code from a group ledger\'s page in the app, then send "/link CODE" here to connect this chat to it.',
+        'Hi! I log expenses into Ledgr. Generate a link code from a group ledger\'s page in the app, then send "/link CODE" here to connect this chat to it.',
       );
       return;
     }

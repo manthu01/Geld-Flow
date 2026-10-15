@@ -1,4 +1,4 @@
-# Geld Flow
+# Ledgr
 
 An expense-splitting platform for groups and pairs — IOU ledger, live activity feed, debt simplification, a Telegram bot, a positive-only reputation system, and pixel-art badges.
 

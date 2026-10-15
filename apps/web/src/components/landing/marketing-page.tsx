@@ -35,8 +35,8 @@ function IntroOverlay({ onDone }: { onDone: () => void }) {
       className="fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center gap-4 bg-bg"
     >
       <motion.img
-        src="/geld-flow-icon.jpg"
-        alt="Geld Flow"
+        src="/ledgr-icon.png"
+        alt="Ledgr"
         initial={{ scale: 0.7, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -76,7 +76,7 @@ export function MarketingPage() {
             className="flex justify-center pb-5"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
-            <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-16 w-16 rounded-2xl" />
+            <img src="/ledgr-icon.png" alt="Ledgr" className="h-16 w-16 rounded-2xl" />
           </motion.div>
 
           <motion.p
@@ -85,7 +85,7 @@ export function MarketingPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="font-mono text-xs uppercase tracking-[0.25em] text-ink-soft"
           >
-            Geld Flow
+            Ledgr
           </motion.p>
 
           <motion.h1

@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Geld Flow",
+  title: "Ledgr",
   description: "Split trips, tabs, and everything in between — without the spreadsheet.",
 };
 

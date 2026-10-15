@@ -143,9 +143,9 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       <Link href="/" onClick={onNavigate} className="flex items-center gap-2 px-1 py-1">
         {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
-        <img src="/geld-flow-icon.jpg" alt="" className="h-7 w-7 rounded-lg" />
+        <img src="/ledgr-icon.png" alt="" className="h-7 w-7 rounded-lg" />
         <span className="font-display text-lg font-semibold tracking-tight text-ink">
-          Geld Flow
+          Ledgr
         </span>
       </Link>
 
@@ -384,7 +384,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <Link href="/" className="flex items-center gap-2 lg:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
-            <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-6 w-6 rounded-md" />
+            <img src="/ledgr-icon.png" alt="Ledgr" className="h-6 w-6 rounded-md" />
           </Link>
 
           <nav className="hidden gap-1 lg:flex">

@@ -298,7 +298,7 @@ export default function AdminPage() {
       <div className="w-full max-w-6xl space-y-6">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">Admin</h1>
-          <p className="text-sm text-ink-soft">How Geld Flow is actually doing.</p>
+          <p className="text-sm text-ink-soft">How Ledgr is actually doing.</p>
         </div>
 
         {loading ? (

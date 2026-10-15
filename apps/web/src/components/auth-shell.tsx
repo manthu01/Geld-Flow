@@ -28,7 +28,7 @@ export function AuthShell({
         <div className="animate-fade-in-up space-y-2 text-center">
           <div className="flex justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- tiny static local asset, next/image is overkill here */}
-            <img src="/geld-flow-icon.jpg" alt="Geld Flow" className="h-14 w-14 rounded-2xl" />
+            <img src="/ledgr-icon.png" alt="Ledgr" className="h-14 w-14 rounded-2xl" />
           </div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-sm text-ink-soft">{subtitle}</p>

@@ -61,7 +61,7 @@ export default function SignupPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Set a password to get started with Geld Flow."
+      subtitle="Set a password to get started with Ledgr."
       footer={
         <>
           Already have an account?{" "}

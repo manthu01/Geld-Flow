@@ -70,7 +70,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Sign in to Geld Flow"
+      title="Sign in to Ledgr"
       subtitle="Welcome back — enter your details to continue."
       footer={
         <>
